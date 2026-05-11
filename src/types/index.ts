@@ -62,7 +62,7 @@ export interface Report {
   created_at: string;
 }
 
-export type Intent = "refine" | "ask" | "accept";
+export type Intent = "refine" | "ask" | "accept" | "compare";
 
 export interface IntentResult {
   intent: Intent;
