@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+graphify-out/
 
 # testing
 /coverage
@@ -46,9 +47,10 @@ next-env.d.ts
 
 # agentic environment
 .gemini/
-brain/
+.claude/
 artifacts/
 scratch/
+CLAUDE.md
 implementation_plan.md
 task.md
 walkthrough.md

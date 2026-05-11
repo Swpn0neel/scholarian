@@ -13,8 +13,32 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Scholarian",
-  description: "A high-end editorial research journey.",
+  title: {
+    default: "Scholarian — AI Research Intelligence",
+    template: "%s | Scholarian",
+  },
+  description:
+    "Automate deep academic research with an AI agent that synthesizes, critiques, and connects complex ideas. Fetch from arXiv, Semantic Scholar, and Google Scholar in seconds.",
+  keywords: ["academic research", "AI research assistant", "literature review", "paper synthesis", "Gemini AI"],
+  authors: [{ name: "Scholarian" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://scholarian.ai",
+    siteName: "Scholarian",
+    title: "Scholarian — AI Research Intelligence",
+    description:
+      "Automate deep academic research with an AI agent that synthesizes, critiques, and connects complex ideas.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Scholarian — AI Research Intelligence",
+    description: "Automate deep academic research with AI-powered synthesis.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -27,7 +51,7 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${inter.variable} antialiased`}
     >
-      <body className="font-sans bg-surface text-on-surface min-h-full flex flex-col">{children}</body>
+      <body suppressHydrationWarning className="font-sans bg-surface text-on-surface min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

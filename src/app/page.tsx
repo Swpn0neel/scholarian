@@ -1,10 +1,5 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import { 
-  Bell, 
-  Settings, 
   ArrowRight, 
   Search, 
   Network, 
@@ -12,12 +7,8 @@ import {
   Sparkles,
   ChevronRight,
   Database,
-  BarChart,
-  RefreshCcw,
-  CheckCircle2,
   FileText
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
@@ -58,7 +49,7 @@ export default function Home() {
           </h1>
           
           <p className="text-xl text-secondary leading-relaxed mb-10 max-w-xl">
-            Automate deep academic research with an AI agent that doesn't just read papers— it synthesizes, critiques, and connects complex ideas to accelerate your analytical workflow.
+            Automate deep academic research with an AI agent that doesn&apos;t just read papers— it synthesizes, critiques, and connects complex ideas to accelerate your analytical workflow.
           </p>
           
           <div className="flex flex-wrap items-center gap-4 mb-12">

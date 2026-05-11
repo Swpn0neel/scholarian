@@ -19,6 +19,17 @@ Engage in a dynamic dialogue with your curated library. Ask complex questions an
 
 ---
 
+## ✨ Key Features
+
+- **Persistent Research History**: Every search run, ranked paper set, and generated report is persisted via Supabase, allowing you to resume your research across sessions.
+- **Stateful Research Pipeline**: A real-time, event-driven pipeline that tracks every stage from query enrichment to report generation with detailed logging.
+- **Optimistic UI Updates**: Instantaneous sidebar navigation and chat management (create, rename, delete) powered by a global Zustand state.
+- **Smart Refinement**: Built-in intent analysis that understands when you want to narrow down your topic, re-running the pipeline with excluded previous results to surface fresh insights.
+- **Analytical Lens Workspace**: A premium, responsive research dashboard featuring resizable sidebars, fullscreen report viewing, and horizontal data grids optimized for all devices.
+- **PDF Export Engine**: Generate high-fidelity PDF versions of your research reports and comparative analyses for offline study.
+
+---
+
 ## 🎨 The "Analytical Lens" Design System
 
 Scholarian follows a unique design philosophy we call **The Analytical Lens**.
@@ -31,8 +42,11 @@ Scholarian follows a unique design philosophy we call **The Analytical Lens**.
 
 ## 🛠 Tech Stack
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router, Turbopack)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) with a custom design system
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Turbopack)
+- **AI Core**: [Google Generative AI (Gemini)](https://ai.google.dev/)
+- **Database & Auth**: [Supabase](https://supabase.com/)
+- **State Management**: [Zustand](https://zustand-demo.pmnd.rs/)
+- **Styling**: [Tailwind CSS 4.0](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Components**: [Base UI](https://base-ui.com/) & Radix-inspired custom builders
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
@@ -41,19 +55,26 @@ Scholarian follows a unique design philosophy we call **The Analytical Lens**.
 
 ## 🚀 Getting Started
 
-First, install the dependencies using `pnpm`:
+### Prerequisites
 
+You will need the following environment variables:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
+
+### Installation
+
+1. Install the dependencies using `pnpm`:
 ```bash
 pnpm install
 ```
 
-Then, run the development server:
-
+2. Run the development server:
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to explore the landing page and the authentication flow.
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to explore the landing page and the research workspace.
 
 ---
 

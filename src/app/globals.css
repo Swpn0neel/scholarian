@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+
 
 @custom-variant dark (&:is(.dark *));
 
@@ -8,7 +7,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-heading: var(--font-manrope);
 
   /* Scholarian Colors */
@@ -111,4 +110,207 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading tracking-[-0.02em];
   }
+}
+
+/* ============================================================
+   Report Body — styles for HTML emitted by marked()
+   Used exclusively inside .report-body article elements
+   ============================================================ */
+.report-body {
+  color: #1e293b;
+  font-size: 0.9375rem;   /* 15px */
+  line-height: 1.75;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Headings */
+.report-body h1 {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #003178;
+  letter-spacing: -0.03em;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e8edf6;
+}
+.report-body h1:first-child { margin-top: 0; }
+
+.report-body h2 {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  color: #003178;
+  letter-spacing: -0.025em;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.report-body h2::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  border-radius: 2px;
+  background: #003178;
+  flex-shrink: 0;
+}
+
+.report-body h3 {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+  margin-top: 1.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.report-body h4, .report-body h5, .report-body h6 {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Paragraphs */
+.report-body p {
+  margin-bottom: 1rem;
+  color: #334155;
+}
+.report-body p:last-child { margin-bottom: 0; }
+
+/* Strong / em */
+.report-body strong { font-weight: 700; color: #1e293b; }
+.report-body em     { font-style: italic; color: #475569; }
+
+/* Lists */
+.report-body ul,
+.report-body ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  color: #334155;
+}
+.report-body ul { list-style-type: disc; }
+.report-body ol { list-style-type: decimal; }
+.report-body li {
+  margin-bottom: 0.35rem;
+  line-height: 1.65;
+}
+.report-body li > p { margin-bottom: 0.25rem; }
+
+/* Nested lists */
+.report-body ul ul,
+.report-body ol ul { list-style-type: circle; margin-top: 0.25rem; }
+.report-body ul ol,
+.report-body ol ol { list-style-type: lower-alpha; margin-top: 0.25rem; }
+
+/* Blockquote */
+.report-body blockquote {
+  border-left: 4px solid #003178;
+  background: #f0f4ff;
+  margin: 1.25rem 0;
+  padding: 0.875rem 1.25rem;
+  border-radius: 0 8px 8px 0;
+  color: #003178;
+  font-style: italic;
+}
+.report-body blockquote p { color: inherit; margin-bottom: 0; }
+
+/* Horizontal rule */
+.report-body hr {
+  border: none;
+  border-top: 1.5px solid #e2e8f0;
+  margin: 2rem 0;
+}
+
+/* Inline code */
+.report-body code:not(pre code) {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  border-radius: 5px;
+  padding: 0.1em 0.45em;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+/* Code blocks */
+.report-body pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 1.125rem 1.25rem;
+  overflow-x: auto;
+  margin: 1.25rem 0;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  box-shadow: 0 4px 16px -4px rgba(0,0,0,0.25);
+}
+.report-body pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+/* Tables */
+.report-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 1.25rem 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #e2e8f0;
+}
+.report-body thead {
+  background: #003178;
+  color: #ffffff;
+}
+.report-body th {
+  font-family: var(--font-manrope), ui-sans-serif, sans-serif;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+}
+.report-body td {
+  padding: 0.5625rem 0.875rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+.report-body tbody tr:last-child td { border-bottom: none; }
+.report-body tbody tr:nth-child(even) { background: #f8fafc; }
+.report-body tbody tr:hover { background: #f0f4ff; }
+
+/* Links */
+.report-body a {
+  color: #003178;
+  text-decoration: underline;
+  text-decoration-color: #93c5fd;
+  text-underline-offset: 3px;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+.report-body a:hover {
+  color: #0d47a1;
+  text-decoration-color: #003178;
+}
+
+/* Images */
+.report-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 1rem 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
