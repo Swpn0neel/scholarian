@@ -6,9 +6,7 @@ import { useRouter } from "next/navigation";
 import { 
   Sparkles, 
   ArrowLeft, 
-  Mail, 
   ShieldCheck,
-  GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,13 +74,6 @@ export default function AuthPage() {
     router.push(nextPath());
   }
 
-  async function handleOAuth(provider: "github" | "google") {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath())}` },
-    });
-  }
 
   return (
     <main className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-primary/20">
@@ -195,37 +186,7 @@ export default function AuthPage() {
                 : "SEND RESET LINK"}
             </Button>
 
-            {mode !== "forgot" && (
-              <>
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-secondary/10" />
-                  </div>
-                  <div className="relative flex justify-center text-[10px] font-bold tracking-widest uppercase">
-                    <span className="bg-white px-3 text-secondary/40">Or continue with</span>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleOAuth("github")}
-                    className="bg-white border border-secondary/10 hover:bg-surface h-11 rounded-xl text-xs font-bold text-secondary gap-2"
-                  >
-                  <GitBranch className="w-4 h-4" /> GITHUB
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void handleOAuth("google")}
-                    className="bg-white border border-secondary/10 hover:bg-surface h-11 rounded-xl text-xs font-bold text-secondary gap-2"
-                  >
-                    <Mail className="w-4 h-4" /> GOOGLE
-                  </Button>
-                </div>
-              </>
-            )}
           </CardContent>
           <CardFooter className="bg-surface/50 border-t border-secondary/5 py-4 flex flex-col gap-3">
              <div className="flex items-center gap-2 opacity-60">
@@ -234,9 +195,9 @@ export default function AuthPage() {
              </div>
              <p className="text-[9px] text-secondary text-center px-6 leading-relaxed">
                By proceeding, you agree to Scholarian&apos;s{" "}
-               <Link href="/terms" className="text-primary underline">Terms of Service</Link>{" "}
+               Terms of Service{" "}
                and{" "}
-               <Link href="/privacy" className="text-primary underline">Privacy Policy</Link>.
+               Privacy Policy.
              </p>
           </CardFooter>
           </form>
