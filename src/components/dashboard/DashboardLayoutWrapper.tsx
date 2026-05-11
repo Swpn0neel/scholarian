@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Menu, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { NewChatButton } from "@/components/dashboard/NewChatButton";
 
 export function DashboardLayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

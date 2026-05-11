@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, FileSearch, Sparkles } from "lucide-react";
+import { FileSearch, Sparkles } from "lucide-react";
 import { NewChatButton } from "@/components/dashboard/NewChatButton";
 import { createClient } from "@/lib/supabase/client";
 

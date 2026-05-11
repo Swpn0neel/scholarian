@@ -233,7 +233,7 @@ export default function AuthPage() {
                 <span className="text-[10px] font-bold text-secondary tracking-wide uppercase">Enterprise-Grade Security Enforced</span>
              </div>
              <p className="text-[9px] text-secondary text-center px-6 leading-relaxed">
-               By proceeding, you agree to Scholarian's{" "}
+               By proceeding, you agree to Scholarian&apos;s{" "}
                <Link href="/terms" className="text-primary underline">Terms of Service</Link>{" "}
                and{" "}
                <Link href="/privacy" className="text-primary underline">Privacy Policy</Link>.

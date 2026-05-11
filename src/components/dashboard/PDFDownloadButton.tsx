@@ -332,7 +332,7 @@ function ResearchReportPDF({
         {/* ---- Header band ---- */}
         <View style={styles.headerBand} fixed>
           <Text style={styles.headerTitle}>Scholarian Research Report</Text>
-          <Text style={styles.headerSub}>Generated {generatedAt} · scholarian.app</Text>
+          <Text style={styles.headerSub}>Generated {generatedAt} · scholarian.vercel.app</Text>
         </View>
 
         {/* ---- Report body ---- */}

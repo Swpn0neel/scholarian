@@ -14,7 +14,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "Scholarian — AI Research Intelligence",
+    default: "Scholarian",
     template: "%s | Scholarian",
   },
   description:
@@ -24,9 +24,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://scholarian.ai",
+    url: "https://scholarian.vercel.app",
     siteName: "Scholarian",
-    title: "Scholarian — AI Research Intelligence",
+    title: "Scholarian",
     description:
       "Automate deep academic research with an AI agent that synthesizes, critiques, and connects complex ideas.",
   },
@@ -38,6 +38,9 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+  icons: {
+    icon: "/favicon.svg",
   },
 };
 

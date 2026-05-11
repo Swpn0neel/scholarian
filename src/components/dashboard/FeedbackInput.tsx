@@ -241,8 +241,6 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
     }
   }
 
-  const statusLabel = status === "refining" ? "Refining…" : status === "comparing" ? "Comparing…" : status === "loading" ? "Working…" : "Send";
-
   return (
     <form
       onSubmit={handleSubmit}

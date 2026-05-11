@@ -4,7 +4,7 @@ Scholarian is a high-end, editorial research platform designed to transform the 
 
 ![Project Landing Page](./public/landing.png)
 
-## 🏛 The Architecture of Insight
+## The Architecture of Insight
 
 Scholarian is built on three core pillars designed for exhaustive academic analysis:
 
@@ -19,7 +19,7 @@ Engage in a dynamic dialogue with your curated library. Ask complex questions an
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 - **Persistent Research History**: Every search run, ranked paper set, and generated report is persisted via Supabase, allowing you to resume your research across sessions.
 - **Stateful Research Pipeline**: A real-time, event-driven pipeline that tracks every stage from query enrichment to report generation with detailed logging.
@@ -30,7 +30,7 @@ Engage in a dynamic dialogue with your curated library. Ask complex questions an
 
 ---
 
-## 🎨 The "Analytical Lens" Design System
+## The "Analytical Lens" Design System
 
 Scholarian follows a unique design philosophy we call **The Analytical Lens**.
 
@@ -40,7 +40,7 @@ Scholarian follows a unique design philosophy we call **The Analytical Lens**.
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Turbopack)
 - **AI Core**: [Google Generative AI (Gemini)](https://ai.google.dev/)
@@ -53,7 +53,7 @@ Scholarian follows a unique design philosophy we call **The Analytical Lens**.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -78,6 +78,6 @@ pnpm dev
 
 ---
 
-## 🗝 License
+## License
 
 Copyright © 2026 Scholarian AI. Distributed under the MIT License. Precision in every insight.

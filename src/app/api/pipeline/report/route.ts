@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { fallbackMarkdownReport, buildReportPrompt } from "@/lib/pipeline/report";
+import { buildReportPrompt } from "@/lib/pipeline/report";
 import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { RankedPaper } from "@/types";
-import { DEFAULT_RESEARCH_SETTINGS } from "@/types";
-import { rankPapers } from "@/lib/pipeline/rank";
 
 const schema = z.object({
   runId: z.string(),

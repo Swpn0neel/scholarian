@@ -1,7 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import { createClient } from "@/lib/supabase/client";
 import type { Chat } from "@/types";
 
 interface ChatStore {

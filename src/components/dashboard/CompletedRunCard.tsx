@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, FileText, Trophy, Braces, Search, Layers, Cpu, BarChart2 } from "lucide-react";
+import { Archive, FileText, Trophy } from "lucide-react";
 import type { CompletedRun } from "@/hooks/useResearchStore";
 import { ReportViewer } from "./ReportViewer";
 import { RankedPapersTable } from "./RankedPapersTable";

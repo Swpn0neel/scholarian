@@ -27,13 +27,14 @@ export async function executeWithGeminiFallback<T>(
       const genAI = new GoogleGenerativeAI(keys[i]);
       const model = genAI.getGenerativeModel({ model: modelName });
       return await action(model, genAI);
-    } catch (error: any) {
-      console.warn(`[Gemini Fallback] API key ${i + 1}/${keys.length} failed: ${error?.message || error}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string; status?: number };
+      console.warn(`[Gemini Fallback] API key ${i + 1}/${keys.length} failed: ${err?.message || error}`);
       lastError = error;
       
       // Do not retry if the error is a 400 Bad Request, as this implies a flawed prompt
       // rather than an authentication or quota issue.
-      if (error?.status === 400) {
+      if (err?.status === 400) {
         throw error;
       }
     }

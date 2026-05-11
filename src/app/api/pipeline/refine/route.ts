@@ -64,7 +64,7 @@ Respond ONLY with valid JSON in this exact format:
       explanation: parsed?.explanation ?? "",
       suggestedSettings: currentSettings,
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({
       ok: true,
       refinedTopic: currentTopic ?? "",

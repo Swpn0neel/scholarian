@@ -28,26 +28,6 @@ function send(controller: ReadableStreamDefaultController, event: string, data: 
 }
 
 
-
-/** Fetch from all configured sources in parallel */
-async function fetchAllSources(query: string, maxPapers: number): Promise<RawPaper[]> {
-  const perSource = Math.ceil(maxPapers / 3);
-
-  const [arxiv, semantic, serp] = await Promise.allSettled([
-    fetchArxivPapers(query, perSource),
-    fetchSemanticScholarPapers(query, perSource),
-    fetchSerpApiPapers(query, perSource),
-  ]);
-
-  const arxivPapers = arxiv.status === "fulfilled" ? arxiv.value : [];
-  const semanticPapers = semantic.status === "fulfilled" ? semantic.value : [];
-  const serpPapers = serp.status === "fulfilled" ? serp.value : [];
-
-  const results: RawPaper[] = [...arxivPapers, ...semanticPapers, ...serpPapers];
-
-  return results;
-}
-
 export async function POST(request: Request) {
   // Auth guard — 401 for unauthenticated callers when Supabase is configured
   const auth = await requireAuth();

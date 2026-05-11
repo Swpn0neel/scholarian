@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { GripVertical, LogOut, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,8 +18,6 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(280);
-  const pathname = usePathname();
-
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
