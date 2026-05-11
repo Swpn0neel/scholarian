@@ -53,7 +53,7 @@ Question: ${question}`;
       return result.response.text();
     });
     return NextResponse.json({ answer: text });
-  } catch (_error) {
+  } catch {
     return NextResponse.json({
       answer: "Failed to generate answer. Ensure your Gemini API keys are valid and have quota available.",
     });
