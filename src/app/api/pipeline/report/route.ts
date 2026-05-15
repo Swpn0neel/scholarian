@@ -109,8 +109,21 @@ export async function POST(request: Request) {
     const papersToInsert = allPapers.map((paper: RankedPaper) => ({
       run_id: runId,
       chat_id: chatId,
-      ...paper,
-      id: undefined, // let DB generate
+      title: paper.title,
+      abstract: paper.abstract,
+      authors: paper.authors,
+      year: paper.year,
+      citation_count: paper.citationCount,
+      doi: paper.doi,
+      venue: paper.venue,
+      url: paper.url,
+      pdf_url: paper.pdfUrl,
+      source: paper.source,
+      sim_score: paper.simScore,
+      citation_score: paper.citationScore,
+      recency_score: paper.recencyScore,
+      final_score: paper.finalScore,
+      rank: paper.rank,
     }));
     await supabase.from("papers").insert(papersToInsert);
   }

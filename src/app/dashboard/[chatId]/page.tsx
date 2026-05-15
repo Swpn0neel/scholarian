@@ -210,10 +210,40 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
           />
         )}
 
-        {/* Active run messages */}
-        {pipeline.currentRunId && messagesByRunId.get(pipeline.currentRunId) && (
-          <QAThread messages={messagesByRunId.get(pipeline.currentRunId)!} reportCount={reportCount} />
-        )}
+        {/* Active run messages (includes report messages once generation completes) */}
+        {pipeline.currentRunId && (() => {
+          let activeRunMsgs = messagesByRunId.get(pipeline.currentRunId) ?? [];
+
+          // If the report is done but not yet in messagesByRunId (e.g. first render after
+          // streaming finishes, or after history hydration with missing reportPapers),
+          // synthesize a report message inline so it's never invisible.
+          const hasReportMsg = activeRunMsgs.some(
+            (m) => m.type === "report" && m.answer === pipeline.reportMarkdown
+          );
+          if (
+            pipeline.reportMarkdown &&
+            pipeline.step === "report_ready" &&
+            !hasReportMsg
+          ) {
+            activeRunMsgs = [
+              ...activeRunMsgs,
+              {
+                id: `synth-active-${pipeline.currentRunId}`,
+                type: "report" as const,
+                question: `Research report · ${pipeline.settings.topic}`,
+                answer: pipeline.reportMarkdown,
+                index: (activeRunMsgs.at(-1)?.index ?? 0) + 1,
+                createdAt: Date.now(),
+                runId: pipeline.currentRunId,
+                reportPapers: pipeline.papers.slice(0, pipeline.settings.topK),
+                reportTopK: pipeline.settings.topK,
+              },
+            ].sort((a, b) => a.createdAt - b.createdAt);
+          }
+
+          if (!activeRunMsgs.length) return null;
+          return <QAThread messages={activeRunMsgs} reportCount={reportCount} />;
+        })()}
 
         {/* ── Feedback / chat input ── */}
         {(hasActiveReport || pipeline.papers.length > 0) && (

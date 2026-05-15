@@ -95,7 +95,7 @@ export async function POST(request: Request) {
         
         send(controller, "step", { step: "ranked", message: "Saving papers to database..." });
         
-        // Insert papers into Supabase
+        // Insert papers into Supabase — use snake_case to match DB column names
         const papersToInsert = ranked.map((paper) => ({
           run_id: runId,
           chat_id: chatId,
@@ -103,16 +103,16 @@ export async function POST(request: Request) {
           abstract: paper.abstract,
           authors: paper.authors,
           year: paper.year,
-          citationCount: paper.citationCount,
+          citation_count: paper.citationCount,
           doi: paper.doi,
           venue: paper.venue,
           url: paper.url,
-          pdfUrl: paper.pdfUrl,
+          pdf_url: paper.pdfUrl,
           source: paper.source,
-          simScore: paper.simScore,
-          citationScore: paper.citationScore,
-          recencyScore: paper.recencyScore,
-          finalScore: paper.finalScore,
+          sim_score: paper.simScore,
+          citation_score: paper.citationScore,
+          recency_score: paper.recencyScore,
+          final_score: paper.finalScore,
           rank: paper.rank,
         }));
         

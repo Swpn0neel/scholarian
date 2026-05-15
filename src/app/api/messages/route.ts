@@ -9,7 +9,7 @@ const schema = z.object({
   question: z.string().min(1),
   answer: z.string().min(1),
   questionIndex: z.number().int().positive(),
-  type: z.enum(["qa", "refine", "compare"]).default("qa"),
+  type: z.enum(["qa", "refine", "compare", "report"]).default("qa"),
 });
 
 export async function POST(request: Request) {

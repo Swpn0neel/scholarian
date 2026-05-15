@@ -126,8 +126,8 @@ export function RankedPapersTable({
                 </td>
                 <td className="px-3 py-3 text-secondary">{paper.year ?? "n/a"}</td>
                 <td className="px-3 py-3 text-secondary">{paper.citationCount}</td>
-                <td className="px-3 py-3 text-secondary">{paper.simScore.toFixed(3)}</td>
-                <td className="px-3 py-3 font-semibold text-tertiary">{paper.finalScore.toFixed(3)}</td>
+                <td className="px-3 py-3 text-secondary">{(paper.simScore ?? 0).toFixed(3)}</td>
+                <td className="px-3 py-3 font-semibold text-tertiary">{(paper.finalScore ?? 0).toFixed(3)}</td>
                 <td className="px-3 py-3">
                   <Badge className="rounded-md bg-secondary-container/60 text-primary">{paper.source}</Badge>
                 </td>
@@ -164,7 +164,7 @@ export function RankedPapersTable({
               <div>Venue: {selectedPaper.venue ?? "n/a"}</div>
               <div>DOI: {selectedPaper.doi ?? "n/a"}</div>
               <div>Citations: {selectedPaper.citationCount}</div>
-              <div>Final Score: <span className="font-semibold text-tertiary">{selectedPaper.finalScore.toFixed(3)}</span></div>
+              <div>Final Score: <span className="font-semibold text-tertiary">{(selectedPaper.finalScore ?? 0).toFixed(3)}</span></div>
             </div>
             {(selectedPaper.pdfUrl || selectedPaper.url) && (
               <a

@@ -233,17 +233,20 @@ export function usePipeline(chatId: string) {
     });
 
     // Persist settings + events to DB so they survive page reloads.
-    // Use getState() to capture the events that were added during streaming.
-    const { currentRunId, events } = useResearchStore.getState();
-    if (currentRunId) {
+    // Capture runId from the store now (set synchronously by the done handler above).
+    // Reading directly from getState() avoids a stale closure and ensures we have the
+    // correct ID even if a concurrent UI action touches the store.
+    const finalState = useResearchStore.getState();
+    const savedRunId = finalState.currentRunId;
+    if (savedRunId) {
       void fetch("/api/pipeline/metadata", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          runId: currentRunId,
+          runId: savedRunId,
           chatId,
           settings,
-          events,
+          events: finalState.events,
         }),
       });
     }
