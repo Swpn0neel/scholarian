@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Pencil, Trash2, X, Check, Loader2, AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { cn } from "@/lib/utils";
 
 export function ChatList() {
   const params = useParams<{ chatId?: string }>();
+  const router = useRouter();
   const activeChatId = params?.chatId;
 
   const { chats, isLoading, renameChat, deleteChat } = useChat();
@@ -17,8 +17,14 @@ export function ChatList() {
   const [title, setTitle] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [navigatingToId, setNavigatingToId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear navigation indicator once the route actually changes
+  useEffect(() => {
+    setNavigatingToId(null);
+  }, [activeChatId]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -180,22 +186,40 @@ export function ChatList() {
             ) : (
               /* Normal view */
               <div className="flex items-center gap-2 px-2">
-                <Link
-                  href={`/dashboard/${chat.id}`}
-                  className={cn(
-                    "flex-1 truncate py-2 text-sm transition-colors",
-                    isPendingDelete ? "text-red-700 font-medium" : "text-on-surface hover:text-primary"
-                  )}
-                >
-                  {isActuallyDeleting ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="size-3 animate-spin" />
-                      Deleting…
-                    </span>
-                  ) : (
-                    chat.title
-                  )}
-                </Link>
+                <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (chat.id === activeChatId || navigatingToId === chat.id) return;
+                  setNavigatingToId(chat.id);
+                  router.push(`/dashboard/${chat.id}`);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    if (chat.id === activeChatId || navigatingToId === chat.id) return;
+                    setNavigatingToId(chat.id);
+                    router.push(`/dashboard/${chat.id}`);
+                  }
+                }}
+                className={cn(
+                  "flex-1 cursor-pointer truncate py-2 text-sm transition-colors",
+                  isPendingDelete ? "text-red-700 font-medium" : "text-on-surface hover:text-primary"
+                )}
+              >
+                {isActuallyDeleting ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="size-3 animate-spin" />
+                    Deleting…
+                  </span>
+                ) : navigatingToId === chat.id ? (
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <Loader2 className="size-3 animate-spin" />
+                    <span className="text-xs">Switching…</span>
+                  </span>
+                ) : (
+                  chat.title
+                )}
+              </div>
 
                 {/* Action buttons — visible on hover (or always when pending) */}
                 {!isPendingDelete && (

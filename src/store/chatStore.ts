@@ -16,7 +16,7 @@ interface ChatStore {
 /** Global singleton store — all components share the same chat list. */
 export const useChatStore = create<ChatStore>((set) => ({
   chats: [],
-  isLoading: false,
+  isLoading: true,
   setChats: (chats) => set({ chats }),
   setIsLoading: (v) => set({ isLoading: v }),
   optimisticAdd: (chat) =>

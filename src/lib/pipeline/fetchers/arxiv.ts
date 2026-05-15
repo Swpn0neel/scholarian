@@ -21,7 +21,10 @@ export async function fetchArxivPapers(query: string, maxResults: number): Promi
   url.searchParams.set("search_query", `all:${query}`);
   url.searchParams.set("max_results", String(maxResults));
 
-  const response = await fetch(url, { next: { revalidate: 3600 } });
+  const response = await fetch(url, {
+    next: { revalidate: 3600 },
+    signal: AbortSignal.timeout(8000),
+  });
   if (!response.ok) return [];
 
   const xml = await response.text();

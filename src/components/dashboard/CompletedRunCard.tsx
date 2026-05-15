@@ -1,8 +1,9 @@
 "use client";
 
+import { memo } from "react";
 import { Archive, FileText, Trophy } from "lucide-react";
 import type { CompletedRun } from "@/hooks/useResearchStore";
-import { ReportViewer } from "./ReportViewer";
+// ReportViewer imported via QAThread now
 import { RankedPapersTable } from "./RankedPapersTable";
 import { PipelineProgress } from "./PipelineProgress";
 import type { PipelineStep } from "@/types";
@@ -13,7 +14,7 @@ interface Props {
   index: number; // 1-based run number
 }
 
-export function CompletedRunCard({ run, index }: Props) {
+export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: Props) {
   const paperCount = run.papers.length;
   const hasReport = Boolean(run.reportMarkdown);
 
@@ -102,18 +103,7 @@ export function CompletedRunCard({ run, index }: Props) {
           </div>
         )}
 
-        {/* Report */}
-        {hasReport && (
-          <div className="p-4">
-            <ReportViewer
-              markdown={run.reportMarkdown}
-              papers={run.papers}
-              topK={run.settings?.topK ?? 5}
-              isGenerating={false}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
-}
+});

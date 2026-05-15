@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { MessageSquare, GitCompareArrows, RefreshCw, HelpCircle, FileDown, Loader2 } from "lucide-react";
+import { GitCompareArrows, RefreshCw, HelpCircle, FileDown, Loader2, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { QAMessage } from "@/hooks/useResearchStore";
+import { ReportViewer } from "@/components/dashboard/ReportViewer";
 
 const TYPE_CONFIG = {
   qa: {
@@ -28,6 +29,13 @@ const TYPE_CONFIG = {
     headerBg: "bg-gradient-to-r from-[#1a3a5c] to-[#2563eb]",
     badgeClass: "bg-white/20 text-white",
     borderClass: "border-blue-300/30",
+  },
+  report: {
+    icon: BookOpen,
+    label: "Report",
+    headerBg: "", // unused — report renders via ReportViewer
+    badgeClass: "",
+    borderClass: "",
   },
 };
 
@@ -110,22 +118,28 @@ interface QAThreadProps {
   reportCount?: number;
 }
 
-export function QAThread({ messages, reportCount = 0 }: QAThreadProps) {
+export const QAThread = memo(function QAThread({ messages, reportCount = 0 }: QAThreadProps) {
   if (!messages.length) return null;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <MessageSquare className="size-4 text-primary" />
-        <h3 className="font-heading text-base font-semibold text-on-surface">
-          Research Conversation
-        </h3>
-        <span className="ml-auto text-xs text-secondary">
-          {messages.length} exchange{messages.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+      {/* Header removed for unified timeline */}
 
       {messages.map((msg) => {
+        // Report messages get their own full-width viewer inline
+        if (msg.type === "report") {
+          return (
+            <div key={msg.id}>
+              <ReportViewer
+                markdown={msg.answer}
+                papers={msg.reportPapers ?? []}
+                topK={msg.reportTopK ?? 10}
+                isGenerating={false}
+              />
+            </div>
+          );
+        }
+
         const cfg = TYPE_CONFIG[msg.type] ?? TYPE_CONFIG.qa;
         const Icon = cfg.icon;
         const isComparison = msg.type === "compare";
@@ -195,4 +209,4 @@ export function QAThread({ messages, reportCount = 0 }: QAThreadProps) {
       )}
     </div>
   );
-}
+});

@@ -86,10 +86,7 @@ export async function POST(request: Request) {
         });
 
         send(controller, "step", { step: "embedding", message: "Generating 768-dimensional semantic embeddings..." });
-        // Embeddings are simulated here until live DB vector storage is enabled
-        await new Promise((resolve) => setTimeout(resolve, 300));
         send(controller, "step", { step: "embedding", message: "Embeddings complete. Comparing vector distances..." });
-        await new Promise((resolve) => setTimeout(resolve, 200));
 
         send(controller, "step", { step: "scoring", message: "Applying hybrid ranking (relevance × citation × recency)..." });
         const ranked = rankPapers(deduped, settings);

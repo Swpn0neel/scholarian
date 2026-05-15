@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import dynamic from "next/dynamic";
 import {
   BookOpen,
   ChevronDown,
@@ -12,8 +13,13 @@ import {
   Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PDFDownloadButton } from "@/components/dashboard/PDFDownloadButton";
 import type { RankedPaper } from "@/types";
+
+// Lazy-load the PDF renderer — it's ~500 KB and only needed after a report exists
+const PDFDownloadButton = dynamic(
+  () => import("@/components/dashboard/PDFDownloadButton").then((m) => ({ default: m.PDFDownloadButton })),
+  { ssr: false, loading: () => null }
+);
 
 interface ReportViewerProps {
   markdown: string;
@@ -32,6 +38,13 @@ function readTime(words: number) {
   return Math.max(1, Math.round(words / 200));
 }
 
+// Parse markdown → sanitized HTML. Memoised and debounced during streaming.
+function parseHtml(markdown: string): string {
+  if (typeof window === "undefined" || !DOMPurify.isSupported) return "";
+  const rawHtml = marked.parse(markdown || "", { async: false }) as string;
+  return DOMPurify.sanitize(rawHtml);
+}
+
 export function ReportViewer({
   markdown,
   papers = [],
@@ -41,11 +54,32 @@ export function ReportViewer({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const html = useMemo(() => {
-    if (typeof window === "undefined" || !DOMPurify.isSupported) return "";
-    const rawHtml = marked.parse(markdown || "", { async: false }) as string;
-    return DOMPurify.sanitize(rawHtml);
-  }, [markdown]);
+  // Debounce the expensive markdown → HTML conversion during streaming.
+  // While isGenerating=true, we delay re-parsing by 150ms so we don't
+  // saturate the main thread on every incoming SSE chunk.
+  const [html, setHtml] = useState(() => parseHtml(markdown));
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!markdown) {
+      setHtml("");
+      return;
+    }
+    if (isGenerating) {
+      // Debounce while streaming
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        setHtml(parseHtml(markdown));
+      }, 150);
+    } else {
+      // Stream finished — parse immediately for the final render
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setHtml(parseHtml(markdown));
+    }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [markdown, isGenerating]);
 
   const words = useMemo(() => wordCount(markdown), [markdown]);
   const sections = useMemo(
@@ -159,8 +193,8 @@ export function ReportViewer({
             <>
               {/* Collapsed gradient fade */}
               <div
-                className={`relative transition-all duration-500 ${
-                  !isExpanded && !isFullscreen ? "max-h-[480px] overflow-hidden" : ""
+                className={`relative transition-[max-height] duration-500 ease-in-out ${
+                  !isExpanded && !isFullscreen ? "max-h-[480px] overflow-hidden" : "max-h-[9999px]"
                 }`}
               >
                 <article

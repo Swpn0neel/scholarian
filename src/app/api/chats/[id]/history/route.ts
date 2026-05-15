@@ -96,6 +96,7 @@ export async function GET(
     index: m.question_index,
     type: m.type ?? "qa",
     createdAt: new Date(m.created_at).getTime(),
+    runId: m.run_id,
   }));
 
   if (runs.length === 0) {

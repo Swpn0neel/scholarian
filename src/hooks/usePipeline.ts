@@ -84,15 +84,29 @@ export function usePipeline(chatId: string) {
     let isMounted = true;
 
     if (prevChatId.current !== chatId) {
-      store.resetAll();
-      // Restore settings from cache immediately (snappy UX before server responds)
-      const cached = loadCache(chatId);
-      if (cached.settings) store.setSettings(cached.settings);
+      // Immediately reset to clean state.
+      // CRITICAL: clear loadedChatId FIRST so the stale guard in ChatWorkspace
+      // fires synchronously on the very first render of the new route, preventing
+      // any data from the previous chat from bleeding through even for a single frame.
+      const s = useResearchStore.getState();
+      s.setLoadedChatId(null);
+      s.resetAll();
+
+      // Only seed from localStorage for real (persisted) chats — not temp IDs.
+      // Seeding a temp chat would bleed in old cached state before the server returns empty.
+      const isTemp = chatId.startsWith("temp-");
+      if (!isTemp) {
+        const cached = loadCache(chatId);
+        if (cached.settings) s.setSettings(cached.settings);
+        if (cached.completedRuns?.length) {
+          cached.completedRuns.forEach((r) => s.addCompletedRun(r));
+        }
+      }
     }
     prevChatId.current = chatId;
 
     async function loadHistory() {
-      store.setIsLoadingHistory(true);
+      useResearchStore.getState().setIsLoadingHistory(true);
       try {
         const res = await fetch(`/api/chats/${chatId}/history`);
         if (!res.ok) return;
@@ -109,16 +123,15 @@ export function usePipeline(chatId: string) {
         };
         if (!isMounted) return;
 
-        if (data.chatTitle) store.setChatTitle(data.chatTitle);
-        if (data.messages?.length) store.setMessages(data.messages);
+        // Server is authoritative — full reset, then re-populate
+        const s = useResearchStore.getState();
+        s.resetAll();
+
+        if (data.chatTitle) s.setChatTitle(data.chatTitle);
+        if (data.messages?.length) s.setMessages(data.messages);
 
         const allRuns = data.runs ?? [];
         if (allRuns.length === 0) return;
-
-        // Server is authoritative — full reset, then re-populate
-        store.resetAll();
-        if (data.chatTitle) store.setChatTitle(data.chatTitle);
-        if (data.messages?.length) store.setMessages(data.messages);
 
         const olderRuns = allRuns.slice(0, -1);
         const latestRun = allRuns[allRuns.length - 1]!;
@@ -126,7 +139,7 @@ export function usePipeline(chatId: string) {
         // Restore all previous (completed) runs
         for (let i = 0; i < olderRuns.length; i++) {
           const r = olderRuns[i]!;
-          store.addCompletedRun({
+          s.addCompletedRun({
             id: crypto.randomUUID(),
             topic: r.settings?.topic ?? data.chatTitle ?? `Run ${i + 1}`,
             settings: r.settings ?? {
@@ -146,37 +159,40 @@ export function usePipeline(chatId: string) {
         }
 
         // Restore active (latest) run state
-        store.setCurrentRunId(latestRun.runId);
+        s.setCurrentRunId(latestRun.runId);
         if (latestRun.papers?.length) {
-          store.setPapers(latestRun.papers);
-          store.setStep("ranked", "History loaded.");
+          s.setPapers(latestRun.papers);
+          s.setStep("ranked", "History loaded.");
         }
         if (latestRun.reportMarkdown) {
-          store.appendReportMarkdown(latestRun.reportMarkdown);
-          store.setStep("report_ready", "Report loaded.");
+          s.appendReportMarkdown(latestRun.reportMarkdown);
+          s.setStep("report_ready", "Report loaded.");
         }
         // Restore pipeline events from DB
         if (latestRun.events?.length) {
-          latestRun.events.forEach((ev) => store.addEvent(ev.step as never, ev.message));
+          latestRun.events.forEach((ev) => s.addEvent(ev.step as never, ev.message));
         }
         // Restore settings: DB is authoritative, localStorage is fallback
         if (latestRun.settings) {
-          store.setSettings(latestRun.settings);
+          s.setSettings(latestRun.settings);
         } else {
           const cached = loadCache(chatId);
-          if (cached.settings) store.setSettings(cached.settings);
+          if (cached.settings) s.setSettings(cached.settings);
         }
 
       } catch (err) {
         console.error("Failed to load history:", err);
       } finally {
-        store.setIsLoadingHistory(false);
+        const s2 = useResearchStore.getState();
+        s2.setIsLoadingHistory(false);
+        // Mark which chatId is now loaded so components can detect stale state
+        s2.setLoadedChatId(chatId);
       }
     }
 
     if (chatId) void loadHistory();
     return () => { isMounted = false; };
-  }, [chatId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -233,13 +249,35 @@ export function usePipeline(chatId: string) {
     }
   }
 
-  async function generateReport(runId: string) {
+  async function generateReport(runId: string, customIndices?: number[]) {
+    let activeRunId = runId;
+    let papers = store.papers.slice(0, store.settings.topK);
+    const isCustomRun = customIndices && customIndices.length > 0;
+
+    if (isCustomRun) {
+      papers = store.papers.filter((_, i) => customIndices.includes(i));
+      activeRunId = crypto.randomUUID();
+      store.archiveAndKeepPapers();
+      store.setCurrentRunId(activeRunId);
+    } else {
+      store.clearReport();
+    }
+    
     store.setStep("generating_report", "Generating grounded report with Gemini…");
-    const papers = store.papers.slice(0, store.settings.topK);
+
     const response = await fetch("/api/pipeline/report", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ runId, chatId, topic: store.settings.topic, papers }),
+      body: JSON.stringify({ 
+        runId: activeRunId, 
+        chatId, 
+        topic: store.settings.topic, 
+        papers,
+        isCustomRun,
+        allPapers: isCustomRun ? store.papers : undefined,
+        settings: isCustomRun ? store.settings : undefined,
+        events: isCustomRun ? store.events : undefined,
+      }),
     });
     if (!response.ok) { store.setStep("error", `Report request failed: ${response.statusText}`); return; }
     await readSseResponse(response, (message) => {
@@ -247,12 +285,45 @@ export function usePipeline(chatId: string) {
       if (message.event === "done") {
         store.setStep("report_ready", "Report ready.");
         store.addEvent("report_ready", "Report saved and ready for download.");
+
+        // Capture the final state and add the report as a chronological message
+        const { reportMarkdown, messages, papers, settings } = useResearchStore.getState();
+        const nextIndex = (messages.at(-1)?.index ?? 0) + 1;
+        const reportMsg = {
+          id: crypto.randomUUID(),
+          question: isCustomRun
+            ? `Custom report for ${customIndices!.map(i => i + 1).join(", ")} papers`
+            : `Research report · ${settings.topic}`,
+          answer: reportMarkdown,
+          index: nextIndex,
+          type: "report" as const,
+          createdAt: Date.now(),
+          runId: activeRunId,
+          reportPapers: papers.filter((_, i) => isCustomRun ? customIndices!.includes(i) : i < settings.topK),
+          reportTopK: settings.topK,
+        };
+        useResearchStore.getState().addMessage(reportMsg);
+
+        // Persist report as a message entry
+        void fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chatId,
+            runId: activeRunId,
+            question: reportMsg.question,
+            answer: reportMsg.answer,
+            questionIndex: nextIndex,
+            type: "report",
+          }),
+        });
+
         // Update metadata with final event list (includes report_ready)
-        const { events, settings } = useResearchStore.getState();
+        const { events, settings: s2 } = useResearchStore.getState();
         void fetch("/api/pipeline/metadata", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ runId, chatId, settings, events }),
+          body: JSON.stringify({ runId: activeRunId, chatId, settings: s2, events }),
         });
       }
       if (message.event === "error") store.setStep("error", message.data.message);
@@ -276,5 +347,5 @@ export function usePipeline(chatId: string) {
     return text;
   }
 
-  return { ...store, runResearch, generateReport, generateComparison };
+  return { ...store, loadedChatId: store.loadedChatId, runResearch, generateReport, generateComparison };
 }

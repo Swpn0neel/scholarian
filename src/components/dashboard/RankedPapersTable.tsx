@@ -1,15 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { ArrowDownUp, ArrowDown, ArrowUp, ExternalLink, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedPaper } from "@/types";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
 
 type SortKey = "rank" | "title" | "year" | "citationCount" | "simScore" | "finalScore" | "source";
 type SortDir = "asc" | "desc";
+
+function SortIcon({ sortKey, column, sortDir }: { sortKey: SortKey; column: SortKey; sortDir: SortDir }) {
+  if (sortKey !== column) return <ArrowDownUp className="size-3 opacity-40" />;
+  return sortDir === "asc" ? (
+    <ArrowUp className="size-3 text-primary" />
+  ) : (
+    <ArrowDown className="size-3 text-primary" />
+  );
+}
 
 export function RankedPapersTable({
   papers,
@@ -62,14 +70,6 @@ export function RankedPapersTable({
 
   if (!papers.length) return null;
 
-  function SortIcon({ column }: { column: SortKey }) {
-    if (sortKey !== column) return <ArrowDownUp className="size-3 opacity-40" />;
-    return sortDir === "asc" ? (
-      <ArrowUp className="size-3 text-primary" />
-    ) : (
-      <ArrowDown className="size-3 text-primary" />
-    );
-  }
 
   return (
     <section className="rounded-lg border border-secondary/10 bg-white p-5 shadow-sm">
@@ -104,7 +104,7 @@ export function RankedPapersTable({
                     onClick={() => toggleSort(key)}
                   >
                     {label}
-                    <SortIcon column={key} />
+                    <SortIcon sortKey={sortKey} column={key} sortDir={sortDir} />
                   </button>
                 </th>
               ))}

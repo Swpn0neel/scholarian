@@ -7,6 +7,7 @@ import {
   Sparkles, 
   ArrowLeft, 
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   const router = useRouter();
 
   function nextPath() {
@@ -33,6 +35,10 @@ export default function AuthPage() {
     setError("");
     setSuccess("");
     setIsSubmitting(true);
+
+    // For login: show the entering overlay IMMEDIATELY on button click —
+    // zero gap between click and visual feedback. If auth fails, dismiss it.
+    if (mode === "login") setIsEntering(true);
 
     const supabase = createClient();
 
@@ -61,23 +67,55 @@ export default function AuthPage() {
     setIsSubmitting(false);
 
     if (result.error) {
+      // Auth failed — dismiss the overlay and show the error
+      setIsEntering(false);
       setError(result.error.message);
       return;
     }
 
     if (mode === "signup" && !result.data?.session) {
+      setIsEntering(false);
       setSuccess("Success! Please check your email to verify your account.");
       setMode("login");
       return;
     }
 
+    // Login succeeded — overlay is already showing, navigate now
+    setIsEntering(true);
     router.push(nextPath());
   }
 
 
   return (
     <main className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-primary/20">
-      
+
+      {/* Full-screen entering overlay — shown immediately after successful login */}
+      {isEntering && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white/95 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-primary text-white shadow-ambient">
+              <Sparkles className="size-8" />
+              <span className="absolute -bottom-1 -right-1 flex size-5 items-center justify-center rounded-full bg-white shadow-sm">
+                <Loader2 className="size-3 animate-spin text-primary" />
+              </span>
+            </div>
+            <div className="text-center">
+              <p className="font-heading text-xl font-semibold text-on-surface">Entering Scholarian</p>
+              <p className="mt-1 text-sm text-secondary">Loading your research workspace…</p>
+            </div>
+            <div className="flex gap-1.5">
+              {[0, 0.15, 0.3].map((delay, i) => (
+                <span
+                  key={i}
+                  className="size-1.5 rounded-full bg-primary/40 animate-bounce"
+                  style={{ animationDelay: `${delay}s` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />

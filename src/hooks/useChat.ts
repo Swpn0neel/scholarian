@@ -30,7 +30,7 @@ export function useChatSync() {
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`chats-global-${Date.now()}`)
+      .channel("chats-global-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "chats" }, () => {
         void refresh();
       })
@@ -47,7 +47,6 @@ export function useChat() {
 
   const createChat = useCallback(
     async (title = "New research chat") => {
-      // Optimistic: add a placeholder immediately so sidebar updates instantly
       const tempId = `temp-${Date.now()}`;
       const placeholder: Chat = {
         id: tempId,
@@ -58,6 +57,10 @@ export function useChat() {
       };
       store.optimisticAdd(placeholder);
 
+      // Navigate instantly — don't wait for the server
+      router.push(`/dashboard/${tempId}`);
+
+      // Persist in the background; swap temp ID for real ID when done
       try {
         const response = await fetch("/api/chats", {
           method: "POST",
@@ -67,17 +70,20 @@ export function useChat() {
         const chat = (await response.json()) as Chat;
 
         if (response.ok && chat?.id) {
-          // Replace placeholder with real chat
           store.optimisticRemove(tempId);
           store.optimisticAdd(chat);
-          router.push(`/dashboard/${chat.id}`);
+          // Silently replace the temp-ID URL with the real one
+          router.replace(`/dashboard/${chat.id}`);
           return chat;
         } else {
           store.optimisticRemove(tempId);
+          // Already navigated — go back to dashboard root on failure
+          router.replace("/dashboard");
           throw new Error("Failed to create chat");
         }
       } catch (err) {
         store.optimisticRemove(tempId);
+        router.replace("/dashboard");
         throw err;
       }
     },

@@ -31,6 +31,10 @@ const schema = z.object({
         rank: z.number(),
       })
     ),
+  isCustomRun: z.boolean().optional(),
+  allPapers: z.array(z.any()).optional(),
+  settings: z.any().optional(),
+  events: z.array(z.any()).optional(),
 });
 
 function send(controller: ReadableStreamDefaultController, event: string, data: unknown) {
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const body = schema.parse(await request.json());
-  const { runId, chatId, topic = "research topic" } = body;
+  const { runId, chatId, topic = "research topic", isCustomRun, allPapers, settings, events } = body;
   
   const supabase = await createServerSupabaseClient();
 
@@ -86,6 +90,29 @@ export async function POST(request: Request) {
   
   if (!papers || papers.length === 0) {
     return NextResponse.json({ error: "No papers provided for report generation" }, { status: 400 });
+  }
+
+  // Branch a new run in the database if this is a custom report
+  if (isCustomRun && allPapers && settings) {
+    await supabase.from("run_metadata").insert({
+      run_id: runId,
+      chat_id: chatId,
+      topic: settings.topic,
+      max_papers: settings.maxPapers,
+      top_k: settings.topK,
+      weight_relevance: settings.weightRelevance,
+      weight_citation: settings.weightCitation,
+      weight_recency: settings.weightRecency,
+      events: events ?? [],
+    });
+
+    const papersToInsert = allPapers.map((paper: RankedPaper) => ({
+      run_id: runId,
+      chat_id: chatId,
+      ...paper,
+      id: undefined, // let DB generate
+    }));
+    await supabase.from("papers").insert(papersToInsert);
   }
 
   const stream = new ReadableStream({

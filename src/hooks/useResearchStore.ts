@@ -15,8 +15,12 @@ export interface QAMessage {
   question: string;
   answer: string;
   index: number;
-  type: "qa" | "refine" | "compare";
+  type: "qa" | "refine" | "compare" | "report";
   createdAt: number;
+  runId: string | null;
+  /** Only for type='report' — the ranked papers used to generate it */
+  reportPapers?: import("@/types").RankedPaper[];
+  reportTopK?: number;
 }
 
 /** A snapshot of a completed research run (used when refining) */
@@ -45,8 +49,9 @@ interface ResearchStore {
   chatTitle: string | null;
   messages: QAMessage[];
   isAnswering: boolean;
-  /** Snapshots of previous runs — populated when the user refines and re-runs */
   completedRuns: CompletedRun[];
+  /** chatId whose data is currently loaded in the store — null means store is empty/reset */
+  loadedChatId: string | null;
 
   setSettings: (settings: Partial<ResearchSettings>) => void;
   setStep: (step: PipelineStep, message?: string) => void;
@@ -60,8 +65,12 @@ interface ResearchStore {
   addMessage: (msg: QAMessage) => void;
   setMessages: (msgs: QAMessage[]) => void;
   setIsAnswering: (v: boolean) => void;
+  setLoadedChatId: (id: string | null) => void;
+  clearReport: () => void;
   /** Archive current active run into completedRuns, then reset live state */
   archiveAndReset: () => void;
+  /** Snapshot the current report into completedRuns but keep the papers for a new report */
+  archiveAndKeepPapers: () => void;
   /** Full reset — used when switching chats (clears completedRuns too) */
   resetAll: () => void;
   addCompletedRun: (run: CompletedRun) => void;
@@ -81,6 +90,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   messages: [],
   isAnswering: false,
   completedRuns: [],
+  loadedChatId: null as string | null,
 
   setSettings: (settings) =>
     set((state) => ({ settings: { ...state.settings, ...settings } })),
@@ -111,6 +121,8 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   setMessages: (msgs) => set({ messages: msgs }),
   setIsAnswering: (v) => set({ isAnswering: v }),
+  setLoadedChatId: (id) => set({ loadedChatId: id }),
+  clearReport: () => set({ report: null, reportMarkdown: "" }),
   addCompletedRun: (run) =>
     set((state) => ({ completedRuns: [...state.completedRuns, run] })),
 
@@ -158,6 +170,36 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   },
 
   /**
+   * Snapshot the current report into completedRuns, but keep the papers and
+   * settings intact. Used when generating a custom report on the same papers.
+   */
+  archiveAndKeepPapers: () => {
+    const state = get();
+    if (state.reportMarkdown) {
+      const snapshot: CompletedRun = {
+        id: crypto.randomUUID(),
+        topic: state.settings.topic,
+        settings: { ...state.settings },
+        papers: state.papers,
+        reportMarkdown: state.reportMarkdown,
+        runId: state.currentRunId,
+        events: state.events,
+        completedAt: Date.now(),
+      };
+      set((s) => ({
+        completedRuns: [...s.completedRuns, snapshot],
+        // Reset only the report state so we can generate a new one
+        report: null,
+        reportMarkdown: "",
+        step: "ranked",
+      }));
+    } else {
+      // Just clear the report state if it's empty or failed
+      set({ report: null, reportMarkdown: "", step: "ranked" });
+    }
+  },
+
+  /**
    * Full reset — used only when switching to a different chat.
    * Resets EVERYTHING including settings, completedRuns, and messages.
    */
@@ -175,5 +217,6 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       messages: [],
       isAnswering: false,
       completedRuns: [],
+      loadedChatId: null,
     }),
 }));

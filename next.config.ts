@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Add any specific next config options here
+  compress: true,
+  experimental: {
+    // Tree-shake lucide-react to only include icons actually imported
+    optimizePackageImports: ["lucide-react"],
+  },
 };
 
 export default nextConfig;

@@ -2,36 +2,34 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileSearch, Sparkles } from "lucide-react";
+import { FileSearch, Loader2, Sparkles } from "lucide-react";
 import { NewChatButton } from "@/components/dashboard/NewChatButton";
-import { createClient } from "@/lib/supabase/client";
+import { useChatStore } from "@/store/chatStore";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { chats, isLoading } = useChatStore();
 
+  // Redirect to most-recent chat as soon as the store has data
   useEffect(() => {
-    let cancelled = false;
-
-    async function redirectToLatestChat() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("chats")
-        .select("id")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single();
-
-      if (!cancelled && data?.id) {
-        router.replace(`/dashboard/${data.id}`);
-      }
+    if (!isLoading && chats.length > 0) {
+      router.replace(`/dashboard/${chats[0]!.id}`);
     }
+  }, [chats, isLoading, router]);
 
-    void redirectToLatestChat();
-    return () => { cancelled = true; };
-  }, [router]);
+  // Still loading or no chats yet
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[calc(100vh-48px)] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <p className="text-sm text-secondary">Loading your workspace…</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Show a clean loading state while fetching the latest chat.
-  // If there are no chats the query will return nothing and we stay here.
+  // No chats — show the empty state with create prompt
   return (
     <div className="flex min-h-[calc(100vh-48px)] items-center justify-center">
       <section className="max-w-xl text-center">

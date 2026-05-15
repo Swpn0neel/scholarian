@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useMemo, useState } from "react";
 import { Send, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useResearchStore, type QAMessage } from "@/hooks/useResearchStore";
@@ -18,6 +18,8 @@ interface Props {
   disabled?: boolean;
   /** Called when a refinement is requested. Receives refined topic and titles to exclude. */
   onRefineRequest?: (refinedTopic: string, excludeTitles: string[]) => void;
+  /** Called when a custom report generation is requested for specific paper indices. */
+  onCustomReportRequest?: (indices: number[]) => void;
 }
 
 /** Persist a Q&A pair to the DB (fire-and-forget) */
@@ -27,7 +29,7 @@ async function persistMessage(
   question: string,
   answer: string,
   index: number,
-  type: "qa" | "refine" | "compare"
+  type: "qa" | "refine" | "compare" | "report"
 ) {
   await fetch("/api/messages", {
     method: "POST",
@@ -36,7 +38,7 @@ async function persistMessage(
   });
 }
 
-export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
+export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomReportRequest }: Props) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "refining" | "comparing">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +46,11 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
   const store = useResearchStore();
   const isLoading = status !== "idle";
 
-  const placeholder = PLACEHOLDERS[Math.floor(Date.now() / 60000) % PLACEHOLDERS.length];
+  // Stable placeholder — computed once per mount to avoid hydration mismatches
+  const placeholder = useMemo(
+    () => PLACEHOLDERS[Math.floor(Date.now() / 60000) % PLACEHOLDERS.length],
+    []
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,6 +82,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
           index: nextIndex,
           type: "qa",
           createdAt: Date.now(),
+          runId: store.currentRunId,
         };
         store.addMessage(msg);
         void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
@@ -104,6 +111,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
             index: nextIndex,
             type: "compare",
             createdAt: Date.now(),
+            runId: store.currentRunId,
           };
           store.addMessage(msg);
           return;
@@ -145,9 +153,55 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
           index: nextIndex,
           type: "compare",
           createdAt: Date.now(),
+          runId: store.currentRunId,
         };
         store.addMessage(msg);
         void persistMessage(chatId, store.currentRunId, trimmed, comparisonText, nextIndex, "compare");
+        return;
+      }
+
+      // ── CUSTOM REPORT ───────────────────────────────────────────────────
+      if (intent === "generate_custom_report") {
+        const numbers = Array.from(new Set(payload.match(/\d+/g) || []));
+        if (numbers.length > 0) {
+          const allIndices = numbers.map((n) => parseInt(n, 10) - 1);
+          const validIndices = allIndices.filter((i) => i >= 0 && i < store.papers.length);
+
+          if (validIndices.length > 0) {
+            const missing = allIndices.filter((i) => i < 0 || i >= store.papers.length).map(i => i + 1);
+            let answer = `Generating a targeted report for papers: ${validIndices.map((i) => i + 1).sort((a,b) => a-b).join(", ")}…`;
+            if (missing.length > 0) {
+              answer += `\n\n(Note: Papers ${missing.join(", ")} were not found in the current results and were skipped.)`;
+            }
+
+            const msg: QAMessage = {
+              id: crypto.randomUUID(),
+              question: trimmed,
+              answer,
+              index: nextIndex,
+              type: "qa",
+              createdAt: Date.now(),
+              runId: store.currentRunId,
+            };
+            store.addMessage(msg);
+            void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
+            onCustomReportRequest?.(validIndices);
+            return;
+          }
+        }
+
+        // Fallback if no valid numbers found
+        const errorAnswer = "I couldn't find any valid paper numbers in your request. Please specify them using numbers like 'paper 1, 2, 5'.";
+        const errorMsg: QAMessage = {
+          id: crypto.randomUUID(),
+          question: trimmed,
+          answer: errorAnswer,
+          index: nextIndex,
+          type: "qa",
+          createdAt: Date.now(),
+          runId: store.currentRunId,
+        };
+        store.addMessage(errorMsg);
         return;
       }
 
@@ -182,6 +236,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
           index: nextIndex,
           type: "refine",
           createdAt: Date.now(),
+          runId: store.currentRunId,
         };
         store.addMessage(msg);
         void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "refine");
@@ -205,7 +260,8 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: trimmed,
-          reportMarkdown: store.reportMarkdown,
+          // Truncate large reports to avoid bloating the QA request payload
+          reportMarkdown: store.reportMarkdown.slice(0, 6000),
           topic: store.settings.topic,
           papers: store.papers.slice(0, store.settings.topK),
         }),
@@ -220,6 +276,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
         index: nextIndex,
         type: "qa",
         createdAt: Date.now(),
+        runId: store.currentRunId,
       };
       store.addMessage(msg);
       void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
@@ -230,9 +287,10 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest }: Props) {
         id: crypto.randomUUID(),
         question: input || trimmed,
         answer: "Something went wrong. Please try again.",
-        index: store.messages.length + 1,
+        index: (store.messages.at(-1)?.index ?? 0) + 1,
         type: "qa",
         createdAt: Date.now(),
+        runId: store.currentRunId,
       };
       store.addMessage(fallbackMsg);
     } finally {

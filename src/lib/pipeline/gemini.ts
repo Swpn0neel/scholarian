@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export function getGeminiKeys(): string[] {
-  // Support both singular and comma-separated keys
-  const keysStr = process.env.GOOGLE_AI_API_KEYS || process.env.GOOGLE_AI_API_KEYS;
+  // Support both plural (comma-separated) and singular key env vars
+  const keysStr = process.env.GOOGLE_AI_API_KEYS || process.env.GOOGLE_AI_API_KEY;
   if (!keysStr) return [];
   return keysStr.split(",").map((k) => k.trim()).filter(Boolean);
 }
