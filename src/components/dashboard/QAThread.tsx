@@ -41,7 +41,8 @@ const TYPE_CONFIG = {
 
 function AnswerHTML({ markdown }: { markdown: string }) {
   const html = useMemo(() => {
-    if (typeof window === "undefined" || !DOMPurify.isSupported) return "";
+    // DOMPurify requires a browser DOM — guard for environments where it's unavailable
+    if (!DOMPurify.isSupported) return marked.parse(markdown, { async: false }) as string;
     const raw = marked.parse(markdown, { async: false }) as string;
     return DOMPurify.sanitize(raw);
   }, [markdown]);

@@ -46,6 +46,7 @@ function Stepper({
 export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: Props) {
   const weightSum = settings.weightRelevance + settings.weightCitation + settings.weightRecency;
   const isNormalized = Math.abs(weightSum - 1) < 0.001;
+  const isAllZero = weightSum === 0;
 
   return (
     <section className="rounded-lg border border-secondary/10 bg-white p-5 shadow-ambient">
@@ -109,11 +110,17 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-secondary/10 pt-4">
           <div className="text-xs text-secondary">
-            Weight sum: <span className={isNormalized ? "text-tertiary" : "text-amber-700"}>{weightSum.toFixed(2)}</span>
-            {!isNormalized && <span className="ml-2">Weights will be normalized automatically.</span>}
+            {isAllZero ? (
+              <span className="text-red-600 font-semibold">⚠ All weights are zero — at least one must be greater than 0.</span>
+            ) : (
+              <>
+                Weight sum: <span className={isNormalized ? "text-tertiary" : "text-amber-700"}>{weightSum.toFixed(2)}</span>
+                {!isNormalized && <span className="ml-2">Weights will be normalized automatically.</span>}
+              </>
+            )}
           </div>
           <Button
-            disabled={disabled || !settings.topic.trim()}
+            disabled={disabled || !settings.topic.trim() || isAllZero}
             onClick={onRun}
             className="h-10 rounded-lg bg-primary px-5 text-white hover:bg-primary-container"
           >

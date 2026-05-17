@@ -118,6 +118,7 @@ export function usePipeline(chatId: string) {
             reportMarkdown: string;
             settings: ResearchSettings | null;
             events: Array<{ step: PipelineStep; message: string; ts: number }>;
+            createdAt: number | null;
           }>;
           messages?: QAMessage[];
         };
@@ -131,14 +132,26 @@ export function usePipeline(chatId: string) {
         if (data.messages?.length) s.setMessages(data.messages);
 
         const allRuns = data.runs ?? [];
-        if (allRuns.length === 0) return;
+        // Filter out completely empty runs (no papers, no report, no events) —
+        // these can appear if a run_id exists in metadata but the pipeline failed
+        // before saving any papers.
+        const meaningfulRuns = allRuns.filter(
+          (r) => r.papers.length > 0 || r.reportMarkdown || r.events.length > 0
+        );
+        if (meaningfulRuns.length === 0) return;
 
-        const olderRuns = allRuns.slice(0, -1);
-        const latestRun = allRuns[allRuns.length - 1]!;
+        const olderRuns = meaningfulRuns.slice(0, -1);
+        const latestRun = meaningfulRuns[meaningfulRuns.length - 1]!;
 
         // Restore all previous (completed) runs
         for (let i = 0; i < olderRuns.length; i++) {
           const r = olderRuns[i]!;
+          // Prefer the real DB timestamp, then message timestamps, then synthetic fallback
+          const runMessages = (data.messages ?? []).filter((m) => m.runId === r.runId);
+          const completedAt = r.createdAt
+            ?? (runMessages.length > 0 ? Math.max(...runMessages.map((m) => m.createdAt)) : null)
+            ?? (Date.now() - (olderRuns.length - i) * 60000);
+
           s.addCompletedRun({
             id: crypto.randomUUID(),
             topic: r.settings?.topic ?? data.chatTitle ?? `Run ${i + 1}`,
@@ -154,7 +167,7 @@ export function usePipeline(chatId: string) {
             reportMarkdown: r.reportMarkdown,
             runId: r.runId,
             events: r.events,
-            completedAt: Date.now() - (olderRuns.length - i) * 60000,
+            completedAt,
           });
         }
 
@@ -162,15 +175,28 @@ export function usePipeline(chatId: string) {
         s.setCurrentRunId(latestRun.runId);
         if (latestRun.papers?.length) {
           s.setPapers(latestRun.papers);
-          s.setStep("ranked", "History loaded.");
-        }
-        if (latestRun.reportMarkdown) {
+          // If there's a report, show it; otherwise stay at "ranked" so the
+          // Generate Report button is available.
+          if (latestRun.reportMarkdown) {
+            s.appendReportMarkdown(latestRun.reportMarkdown);
+            s.setStep("report_ready", "Report loaded.");
+          } else {
+            // Explicitly set ranked so the pipeline rail shows correctly
+            s.setStep("ranked", "Papers loaded — ready to generate report.");
+          }
+        } else if (latestRun.reportMarkdown) {
+          // Edge case: report exists but papers weren't saved (old bug)
           s.appendReportMarkdown(latestRun.reportMarkdown);
           s.setStep("report_ready", "Report loaded.");
         }
-        // Restore pipeline events from DB
+        // Restore pipeline events from DB — add them after step is set so they
+        // appear in the activity log without overriding the step state.
         if (latestRun.events?.length) {
           latestRun.events.forEach((ev) => s.addEvent(ev.step as never, ev.message));
+        } else if (latestRun.papers?.length) {
+          // No events saved (run predates server-side metadata persistence) —
+          // synthesize minimal events so the activity log isn't empty.
+          s.addEvent("ranked", `Restored ${latestRun.papers.length} ranked papers from database.`);
         }
         // Restore settings: DB is authoritative, localStorage is fallback
         if (latestRun.settings) {
@@ -183,10 +209,15 @@ export function usePipeline(chatId: string) {
       } catch (err) {
         console.error("Failed to load history:", err);
       } finally {
-        const s2 = useResearchStore.getState();
-        s2.setIsLoadingHistory(false);
-        // Mark which chatId is now loaded so components can detect stale state
-        s2.setLoadedChatId(chatId);
+        // Only update state if the component is still mounted and this chatId
+        // is still the active one. Without this guard, a rapid chat switch can
+        // set loadedChatId to a stale value after the new chat's history loads.
+        if (isMounted) {
+          const s2 = useResearchStore.getState();
+          s2.setIsLoadingHistory(false);
+          // Mark which chatId is now loaded so components can detect stale state
+          s2.setLoadedChatId(chatId);
+        }
       }
     }
 
@@ -232,10 +263,11 @@ export function usePipeline(chatId: string) {
       if (message.event === "error") store.setStep("error", message.data.message);
     });
 
-    // Persist settings + events to DB so they survive page reloads.
-    // Capture runId from the store now (set synchronously by the done handler above).
-    // Reading directly from getState() avoids a stale closure and ensures we have the
-    // correct ID even if a concurrent UI action touches the store.
+    // The server already persisted run_metadata (settings + events) during the
+    // pipeline run. The client-side call here is kept only to update the event
+    // list with any additional events that were added after the server saved
+    // (e.g. the "ranked" event added by the papers handler below).
+    // It is fire-and-forget and non-critical — the run is already recoverable.
     const finalState = useResearchStore.getState();
     const savedRunId = finalState.currentRunId;
     if (savedRunId) {

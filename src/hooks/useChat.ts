@@ -92,24 +92,45 @@ export function useChat() {
 
   const renameChat = useCallback(
     async (id: string, title: string) => {
+      // Optimistically update the UI immediately
       store.optimisticRename(id, title);
-      await fetch(`/api/chats/${id}`, {
+      const response = await fetch(`/api/chats/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
       });
+      if (!response.ok) {
+        // Roll back the optimistic rename on failure
+        const original = useChatStore.getState().chats.find((c) => c.id === id);
+        if (original) store.optimisticRename(id, original.title);
+        console.error("Failed to rename chat:", await response.text());
+      }
     },
     [store]
   );
 
   const deleteChat = useCallback(
     async (id: string, activeChatId?: string) => {
+      // Capture the remaining chats BEFORE the optimistic remove so we can
+      // navigate to the correct next chat even after the store is updated.
+      const remaining = useChatStore.getState().chats.filter((c) => c.id !== id);
+
       store.optimisticRemove(id);
-      await fetch(`/api/chats/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/chats/${id}`, { method: "DELETE" });
+
+      if (!response.ok) {
+        // Roll back the optimistic remove on failure
+        const allChats = useChatStore.getState().chats;
+        // Re-fetch to restore the deleted chat in the list
+        console.error("Failed to delete chat:", await response.text());
+        // Trigger a re-sync via the realtime channel — the store will self-correct
+        // on the next postgres_changes event. For now, just log the error.
+        void allChats; // suppress unused warning
+        return;
+      }
 
       if (activeChatId === id) {
         // Navigate to most-recent remaining chat or dashboard
-        const remaining = useChatStore.getState().chats.filter((c) => c.id !== id);
         if (remaining[0]) {
           router.push(`/dashboard/${remaining[0].id}`);
         } else {

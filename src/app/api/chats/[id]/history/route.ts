@@ -1,24 +1,26 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAuth } from "@/lib/supabase/requireAuth";
 
-// Helper to map DB paper rows (snake_case, nullable) to clean camelCase RankedPaper objects.
-// Numeric score fields default to 0 so .toFixed() never crashes on null/undefined values.
+// Helper to map DB paper rows to clean RankedPaper objects.
+// The papers table uses camelCase column names (citationCount, simScore, etc.).
+// Numeric score fields default to 0 so .toFixed() never crashes on null/undefined.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapDbPaper = (p: Record<string, any>) => ({
   title: p.title as string,
   abstract: (p.abstract ?? null) as string | null,
   authors: (p.authors ?? []) as string[],
   year: (p.year ?? null) as number | null,
-  citationCount: ((p.citation_count ?? p.citationCount) ?? 0) as number,
+  citationCount: (p.citationCount ?? 0) as number,
   doi: (p.doi ?? null) as string | null,
   venue: (p.venue ?? null) as string | null,
   url: (p.url ?? null) as string | null,
-  pdfUrl: ((p.pdf_url ?? p.pdfUrl) ?? null) as string | null,
+  pdfUrl: (p.pdfUrl ?? null) as string | null,
   source: (p.source ?? "") as string,
-  simScore: ((p.sim_score ?? p.simScore) ?? 0) as number,
-  citationScore: ((p.citation_score ?? p.citationScore) ?? 0) as number,
-  recencyScore: ((p.recency_score ?? p.recencyScore) ?? 0) as number,
-  finalScore: ((p.final_score ?? p.finalScore) ?? 0) as number,
+  simScore: (p.simScore ?? 0) as number,
+  citationScore: (p.citationScore ?? 0) as number,
+  recencyScore: (p.recencyScore ?? 0) as number,
+  finalScore: (p.finalScore ?? 0) as number,
   rank: (p.rank ?? 0) as number,
 });
 
@@ -26,15 +28,27 @@ export async function GET(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
+  // Auth guard — 401 for unauthenticated callers
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const { id: chatId } = await props.params;
   const supabase = await createServerSupabaseClient();
 
-  // Fetch the chat record
-  const { data: chat } = await supabase
+  // Ownership check — verify the chat belongs to the authenticated user
+  const { data: chat, error: chatError } = await supabase
     .from("chats")
-    .select("title")
+    .select("title, user_id")
     .eq("id", chatId)
     .single();
+
+  if (chatError || !chat) {
+    return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+  }
+
+  if (chat.user_id !== auth.user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   // Fetch ALL papers for this chat (all runs), ordered chronologically
   const { data: allPapers } = await supabase
@@ -54,8 +68,9 @@ export async function GET(
   // Fetch run metadata (settings + events) for all runs in this chat
   const { data: allMetadata } = await supabase
     .from("run_metadata")
-    .select("run_id, topic, max_papers, top_k, weight_relevance, weight_citation, weight_recency, events")
-    .eq("chat_id", chatId);
+    .select("run_id, topic, max_papers, top_k, weight_relevance, weight_citation, weight_recency, events, created_at")
+    .eq("chat_id", chatId)
+    .order("created_at", { ascending: true });
 
   // Fetch Q&A messages
   const { data: messages } = await supabase
@@ -85,6 +100,7 @@ export async function GET(
   const metaByRunId: Record<string, {
     settings: { topic: string; maxPapers: number; topK: number; weightRelevance: number; weightCitation: number; weightRecency: number };
     events: Array<{ step: string; message: string; ts: number }>;
+    createdAt: number;
   }> = {};
   for (const m of allMetadata ?? []) {
     metaByRunId[m.run_id] = {
@@ -97,24 +113,24 @@ export async function GET(
         weightRecency: m.weight_recency ?? 0.2,
       },
       events: (m.events as Array<{ step: string; message: string; ts: number }>) ?? [],
+      createdAt: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
     };
   }
 
   // Supplement runOrder with any run_ids that exist in run_metadata or reports
-  // but NOT in papers — this recovers old chats where papers failed to save (e.g.
-  // due to the camelCase column bug that has since been fixed). The run will render
-  // with an empty papers list but its report and messages will still be restored.
+  // but NOT in papers — this recovers runs where papers failed to save.
+  // Use the metadata's chronological order (already sorted by created_at above).
   const runOrderSet = new Set(runOrder);
-  for (const runId of Object.keys(metaByRunId)) {
-    if (!runOrderSet.has(runId)) {
-      runOrder.push(runId);
-      runOrderSet.add(runId);
+  for (const m of allMetadata ?? []) {
+    if (!runOrderSet.has(m.run_id)) {
+      runOrder.push(m.run_id);
+      runOrderSet.add(m.run_id);
     }
   }
-  for (const runId of Object.keys(reportByRunId)) {
-    if (!runOrderSet.has(runId)) {
-      runOrder.push(runId);
-      runOrderSet.add(runId);
+  for (const report of allReports ?? []) {
+    if (report.run_id && !runOrderSet.has(report.run_id)) {
+      runOrder.push(report.run_id);
+      runOrderSet.add(report.run_id);
     }
   }
 
@@ -127,6 +143,7 @@ export async function GET(
     reportMarkdown: reportByRunId[runId] ?? "",
     settings: metaByRunId[runId]?.settings ?? null,
     events: metaByRunId[runId]?.events ?? [],
+    createdAt: metaByRunId[runId]?.createdAt ?? null,
   }));
 
   // Shape messages — enrich report-type messages with their ranked papers

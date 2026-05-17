@@ -27,7 +27,7 @@ export async function classifyIntent(message: string): Promise<IntentResult> {
     };
   }
 
-  if (["accept", "finalize", "looks good", "done", "lock"].some((t) => normalized.includes(t))) {
+  if (["accept", "finalize", "looks good", "lock", "lock session", "finalize session"].some((t) => normalized.includes(t))) {
     return { intent: "accept", payload: message };
   }
 

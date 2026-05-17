@@ -62,7 +62,10 @@ export async function fetchArxivPapers(query: string, maxResults: number): Promi
       authors,
       year: published ? new Date(published).getFullYear() : null,
       citationCount: 0,
-      doi: arxivId,
+      // arXiv IDs are NOT DOIs — store null so deduplication doesn't confuse
+      // arXiv IDs with real DOIs from Semantic Scholar. The canonical URL is
+      // preserved in the `url` field for linking purposes.
+      doi: null,
       venue: "arXiv",
       url: idRaw,
       pdfUrl,

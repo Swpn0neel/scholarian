@@ -69,8 +69,6 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
       });
       const { intent, payload } = (await intentRes.json()) as { intent: string; payload: string };
 
-      const nextIndex = store.messages.length + 1;
-
       // ── ACCEPT ──────────────────────────────────────────────────────────
       if (intent === "accept") {
         store.setStep("finalized", "Research finalized. Report locked.");
@@ -79,13 +77,14 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
           id: crypto.randomUUID(),
           question: trimmed,
           answer,
-          index: nextIndex,
+          // Re-read message count in case it changed during the intent fetch
+          index: useResearchStore.getState().messages.length + 1,
           type: "qa",
           createdAt: Date.now(),
           runId: store.currentRunId,
         };
         store.addMessage(msg);
-        void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
+        void persistMessage(chatId, store.currentRunId, trimmed, answer, msg.index, "qa");
         return;
       }
 
@@ -108,7 +107,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
             id: crypto.randomUUID(),
             question: trimmed,
             answer: `⚠ ${error}`,
-            index: nextIndex,
+            index: useResearchStore.getState().messages.length + 1,
             type: "compare",
             createdAt: Date.now(),
             runId: store.currentRunId,
@@ -146,17 +145,17 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
         // NOTE: do NOT call store.setStep here — comparison must not
         // affect the main ReportViewer or active pipeline state.
 
-        const msg: QAMessage = {
+        const compareMsg: QAMessage = {
           id: crypto.randomUUID(),
           question: trimmed,
           answer: comparisonText || "Comparison generated.",
-          index: nextIndex,
+          index: useResearchStore.getState().messages.length + 1,
           type: "compare",
           createdAt: Date.now(),
           runId: store.currentRunId,
         };
-        store.addMessage(msg);
-        void persistMessage(chatId, store.currentRunId, trimmed, comparisonText, nextIndex, "compare");
+        store.addMessage(compareMsg);
+        void persistMessage(chatId, store.currentRunId, trimmed, comparisonText, compareMsg.index, "compare");
         return;
       }
 
@@ -174,17 +173,17 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
               answer += `\n\n(Note: Papers ${missing.join(", ")} were not found in the current results and were skipped.)`;
             }
 
-            const msg: QAMessage = {
+            const customMsg: QAMessage = {
               id: crypto.randomUUID(),
               question: trimmed,
               answer,
-              index: nextIndex,
+              index: useResearchStore.getState().messages.length + 1,
               type: "qa",
               createdAt: Date.now(),
               runId: store.currentRunId,
             };
-            store.addMessage(msg);
-            void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
+            store.addMessage(customMsg);
+            void persistMessage(chatId, store.currentRunId, trimmed, answer, customMsg.index, "qa");
             onCustomReportRequest?.(validIndices);
             return;
           }
@@ -196,7 +195,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
           id: crypto.randomUUID(),
           question: trimmed,
           answer: errorAnswer,
-          index: nextIndex,
+          index: useResearchStore.getState().messages.length + 1,
           type: "qa",
           createdAt: Date.now(),
           runId: store.currentRunId,
@@ -229,17 +228,17 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
         const explanation = data.explanation ?? data.message ?? "Topic updated.";
         const answer = `**Refined topic:** "${refinedTopic}"\n\n${explanation}\n\nRe-running the research pipeline with the refined topic…`;
 
-        const msg: QAMessage = {
+        const refineMsg: QAMessage = {
           id: crypto.randomUUID(),
           question: trimmed,
           answer,
-          index: nextIndex,
+          index: useResearchStore.getState().messages.length + 1,
           type: "refine",
           createdAt: Date.now(),
           runId: store.currentRunId,
         };
-        store.addMessage(msg);
-        void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "refine");
+        store.addMessage(refineMsg);
+        void persistMessage(chatId, store.currentRunId, trimmed, answer, refineMsg.index, "refine");
 
         // Capture excluded titles BEFORE archiving current run
         const excludeTitles = store.papers
@@ -269,17 +268,17 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
       const { answer } = (await qaRes.json()) as { answer: string };
       store.setIsAnswering(false);
 
-      const msg: QAMessage = {
+      const qaMsg: QAMessage = {
         id: crypto.randomUUID(),
         question: trimmed,
         answer,
-        index: nextIndex,
+        index: useResearchStore.getState().messages.length + 1,
         type: "qa",
         createdAt: Date.now(),
         runId: store.currentRunId,
       };
-      store.addMessage(msg);
-      void persistMessage(chatId, store.currentRunId, trimmed, answer, nextIndex, "qa");
+      store.addMessage(qaMsg);
+      void persistMessage(chatId, store.currentRunId, trimmed, answer, qaMsg.index, "qa");
 
     } catch {
       store.setIsAnswering(false);

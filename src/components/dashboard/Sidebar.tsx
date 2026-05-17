@@ -153,7 +153,7 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         {/* Resize Handle (Desktop Only) */}
         <div
           onMouseDown={handleResizeStart}
-          className={`fixed inset-y-0 left-0 z-40 hidden lg:block w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${isResizing ? "bg-primary/50" : "bg-transparent"}`}
+          className={`fixed inset-y-0 left-0 z-50 hidden lg:block w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${isResizing ? "bg-primary/50" : "bg-transparent"}`}
           style={{ width: 8, transform: `translateX(${sidebarWidth - 4}px)` }}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">

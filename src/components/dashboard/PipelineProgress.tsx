@@ -34,6 +34,7 @@ const STAGES: Stage[] = [
   { id: "embedding",     label: "Embed",     sublabel: "Semantic vectors",  Icon: Cpu       },
   { id: "scoring",       label: "Score",     sublabel: "Hybrid ranking",    Icon: BarChart2 },
   { id: "ranked",        label: "Rank",      sublabel: "Top-K selected",    Icon: Trophy    },
+  { id: "generating_report", label: "Report", sublabel: "AI synthesis",    Icon: FileText  },
 ];
 
 const RUNNING_STEPS = new Set<PipelineStep>([
@@ -90,13 +91,23 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
 
   const activeStageIndex = STAGES.findIndex((s) => s.id === step);
   const isError = step === "error";
-  const isDone = DONE_STEPS.has(step);
+  // "ranked" means the fetch/rank pipeline is done but report hasn't started yet.
+  // Only treat the pipeline as fully done once the report is also complete.
+  const isRankDone = step === "ranked" || step === "generating_report" || step === "report_ready" || step === "finalized";
+  const isReportDone = step === "report_ready" || step === "finalized";
+  const isReportRunning = step === "generating_report";
+  // isDone for the header badge/progress bar: only true once report is ready too
+  const isDone = isReportDone;
 
   // Overall status label + colour
   const statusLabel = isError
     ? "Error"
-    : isDone
+    : isReportDone
     ? "Complete"
+    : isReportRunning
+    ? "Generating"
+    : isRankDone
+    ? "Ranked"
     : RUNNING_STEPS.has(step)
     ? "Running"
     : "Ready";
@@ -115,10 +126,11 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
             <span
               className={cn(
                 "relative inline-flex size-2.5 rounded-full",
-                isError  && "bg-red-500",
-                isDone   && "bg-tertiary-fixed-dim",
-                isRunning && "bg-primary",
-                !isError && !isDone && !isRunning && "bg-secondary/40"
+                isError       && "bg-red-500",
+                isReportDone  && "bg-tertiary-fixed-dim",
+                isReportRunning && "bg-primary",
+                isRunning     && "bg-primary",
+                !isError && !isReportDone && !isRunning && "bg-secondary/40"
               )}
             />
           </span>
@@ -130,10 +142,11 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
         <span
           className={cn(
             "rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em]",
-            isError  && "bg-red-50 text-red-600",
-            isDone   && "bg-tertiary-fixed-dim/20 text-tertiary",
-            isRunning && "bg-primary/10 text-primary",
-            !isError && !isDone && !isRunning && "bg-secondary/10 text-secondary"
+            isError        && "bg-red-50 text-red-600",
+            isReportDone   && "bg-tertiary-fixed-dim/20 text-tertiary",
+            isReportRunning && "bg-primary/10 text-primary",
+            isRunning && !isReportRunning && "bg-primary/10 text-primary",
+            !isError && !isReportDone && !isRunning && "bg-secondary/10 text-secondary"
           )}
         >
           {statusLabel}
@@ -149,7 +162,7 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
             <div
               className="absolute bottom-0 left-0 h-[2px] bg-primary transition-all duration-700 ease-out"
               style={{
-                width: isDone
+                width: isReportDone
                   ? "100%"
                   : activeStageIndex >= 0
                   ? `${((activeStageIndex + 0.5) / STAGES.length) * 100}%`
@@ -158,10 +171,17 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
             />
           )}
 
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-7 gap-2">
           {STAGES.map((stage, idx) => {
-            const isPast   = isDone || (!isError && idx < activeStageIndex);
-            const isCurrent = !isError && stage.id === step && RUNNING_STEPS.has(step);
+            const isReportStage = stage.id === "generating_report";
+
+            // For the Report stage, use its own independent state
+            const isPast = isReportStage
+              ? isReportDone
+              : isRankDone || (!isError && idx < activeStageIndex);
+            const isCurrent = isReportStage
+              ? isReportRunning
+              : !isError && stage.id === step && RUNNING_STEPS.has(step);
             const Icon = stage.Icon;
 
             return (

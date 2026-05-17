@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
 import { enrichQuery } from "@/lib/pipeline/enrichQuery";
-import { rankPapers } from "@/lib/pipeline/rank";
+import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { fetchArxivPapers } from "@/lib/pipeline/fetchers/arxiv";
@@ -86,16 +86,22 @@ export async function POST(request: Request) {
         });
 
         send(controller, "step", { step: "embedding", message: "Generating 768-dimensional semantic embeddings..." });
+
+        // Embed the enriched query so we can compute real cosine similarity
+        // against each paper's abstract embedding.
+        const queryEmbedding = await embedQuery(enriched);
+
         send(controller, "step", { step: "embedding", message: "Embeddings complete. Comparing vector distances..." });
 
         send(controller, "step", { step: "scoring", message: "Applying hybrid ranking (relevance × citation × recency)..." });
-        const ranked = rankPapers(deduped, settings);
+        const ranked = await rankPapers(deduped, settings, queryEmbedding);
         
         const runId = crypto.randomUUID();
         
         send(controller, "step", { step: "ranked", message: "Saving papers to database..." });
         
-        // Insert papers into Supabase — use snake_case to match DB column names
+        // Insert papers into Supabase — use the actual DB column names.
+        // Note: this table was created with camelCase column names.
         const papersToInsert = ranked.map((paper) => ({
           run_id: runId,
           chat_id: chatId,
@@ -103,22 +109,52 @@ export async function POST(request: Request) {
           abstract: paper.abstract,
           authors: paper.authors,
           year: paper.year,
-          citation_count: paper.citationCount,
+          citationCount: paper.citationCount,
           doi: paper.doi,
           venue: paper.venue,
           url: paper.url,
-          pdf_url: paper.pdfUrl,
+          pdfUrl: paper.pdfUrl,
           source: paper.source,
-          sim_score: paper.simScore,
-          citation_score: paper.citationScore,
-          recency_score: paper.recencyScore,
-          final_score: paper.finalScore,
+          simScore: paper.simScore,
+          citationScore: paper.citationScore,
+          recencyScore: paper.recencyScore,
+          finalScore: paper.finalScore,
           rank: paper.rank,
         }));
         
         const { error: dbError } = await supabase.from("papers").insert(papersToInsert);
         if (dbError) {
           console.error("Failed to save papers to database:", dbError);
+        }
+
+        // Persist run metadata (settings + events) immediately on the server so the
+        // run is fully recoverable even if the user navigates away before the client
+        // has a chance to call /api/pipeline/metadata.
+        const pipelineEvents = [
+          { step: "enriching",     message: `Enriched query: "${enriched}"`,                                    ts: Date.now() - 6000 },
+          { step: "fetching",      message: `Found ${arxivPapers.length} arXiv, ${semanticPapers.length} Semantic Scholar, and ${serpPapers.length} Google Scholar papers.`, ts: Date.now() - 5000 },
+          { step: "deduplicating", message: `${raw.length} papers → ${deduped.length} unique after deduplication`, ts: Date.now() - 4000 },
+          { step: "embedding",     message: "Embeddings complete. Comparing vector distances...",               ts: Date.now() - 3000 },
+          { step: "scoring",       message: "Applying hybrid ranking (relevance × citation × recency)...",     ts: Date.now() - 2000 },
+          { step: "ranked",        message: `Ranked ${ranked.length} papers by composite score.`,              ts: Date.now() - 1000 },
+        ];
+
+        const { error: metaError } = await supabase.from("run_metadata").upsert(
+          {
+            run_id: runId,
+            chat_id: chatId,
+            topic: settings.topic,
+            max_papers: settings.maxPapers,
+            top_k: settings.topK,
+            weight_relevance: settings.weightRelevance,
+            weight_citation: settings.weightCitation,
+            weight_recency: settings.weightRecency,
+            events: pipelineEvents,
+          },
+          { onConflict: "run_id" }
+        );
+        if (metaError) {
+          console.error("Failed to save run metadata to database:", metaError);
         }
 
         send(controller, "papers", ranked);

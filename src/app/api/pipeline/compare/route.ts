@@ -21,11 +21,14 @@ export async function POST(request: Request) {
   const { chatId, reportAIndex, reportBIndex } = schema.parse(await request.json());
   const supabase = await createServerSupabaseClient();
 
-  // Fetch all reports for this chat ordered by creation time
+  // Fetch only research reports (exclude comparison reports) ordered by creation time.
+  // This ensures 1-based indices always refer to research reports, not previously
+  // generated comparisons which would corrupt the index after the first comparison.
   const { data: reports, error } = await supabase
     .from("reports")
     .select("id, content_md, created_at")
     .eq("chat_id", chatId)
+    .not("type", "eq", "comparison")
     .order("created_at", { ascending: true });
 
   if (error || !reports || reports.length < 2) {

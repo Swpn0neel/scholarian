@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { CompletedRunCard } from "@/components/dashboard/CompletedRunCard";
 import { FeedbackInput } from "@/components/dashboard/FeedbackInput";
@@ -46,8 +46,8 @@ function ChatLoadingState() {
 
       {/* Pipeline rail skeleton */}
       <div className="rounded-lg border border-secondary/10 bg-white p-4 shadow-ambient">
-        <div className="grid grid-cols-6 gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-7 gap-2">
+          {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="h-20 rounded-xl bg-secondary/8" />
           ))}
         </div>
@@ -60,12 +60,19 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
   const pipeline = usePipeline(chatId);
   const [refineKey, setRefineKey] = useState(0);
 
+  // Use a ref to hold the latest runResearch so handleRefine doesn't need
+  // pipeline in its dependency array (pipeline is a new object every render).
+  const runResearchRef = useRef(pipeline.runResearch);
+  runResearchRef.current = pipeline.runResearch;
+  const settingsRef = useRef(pipeline.settings);
+  settingsRef.current = pipeline.settings;
+
   const handleRefine = useCallback(
     (refinedTopic: string, excludeTitles: string[]) => {
-      void pipeline.runResearch({ ...pipeline.settings, topic: refinedTopic }, excludeTitles);
+      void runResearchRef.current({ ...settingsRef.current, topic: refinedTopic }, excludeTitles);
       setRefineKey((k) => k + 1);
     },
-    [pipeline]
+    [] // stable — reads latest values via refs
   );
 
   // Group messages by runId for easy rendering
