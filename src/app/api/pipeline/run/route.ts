@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
-import { enrichQuery } from "@/lib/pipeline/enrichQuery";
+// import { enrichQuery } from "@/lib/pipeline/enrichQuery";
 import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -42,8 +42,9 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const enriched = await enrichQuery(settings.topic);
-        send(controller, "step", { step: "enriching", message: `Enriched query: "${enriched}"` });
+        // Temporarily disabled: const enriched = await enrichQuery(settings.topic);
+        const enriched = settings.topic;
+        send(controller, "step", { step: "enriching", message: `Search query: "${enriched}"` });
 
         send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${enriched}"...` });
         
@@ -131,7 +132,7 @@ export async function POST(request: Request) {
         // run is fully recoverable even if the user navigates away before the client
         // has a chance to call /api/pipeline/metadata.
         const pipelineEvents = [
-          { step: "enriching",     message: `Enriched query: "${enriched}"`,                                    ts: Date.now() - 6000 },
+          { step: "enriching",     message: `Search query: "${enriched}"`,                                    ts: Date.now() - 6000 },
           { step: "fetching",      message: `Found ${arxivPapers.length} arXiv, ${semanticPapers.length} Semantic Scholar, and ${serpPapers.length} Google Scholar papers.`, ts: Date.now() - 5000 },
           { step: "deduplicating", message: `${raw.length} papers → ${deduped.length} unique after deduplication`, ts: Date.now() - 4000 },
           { step: "embedding",     message: "Embeddings complete. Comparing vector distances...",               ts: Date.now() - 3000 },
