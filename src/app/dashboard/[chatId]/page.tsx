@@ -76,16 +76,17 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
   );
 
   // Group messages by runId for easy rendering
+  const { messages } = pipeline;
   const messagesByRunId = useMemo(() => {
-    const map = new Map<string, typeof pipeline.messages>();
-    for (const msg of pipeline.messages) {
+    const map = new Map<string, typeof messages>();
+    for (const msg of messages) {
       if (msg.runId) {
         if (!map.has(msg.runId)) map.set(msg.runId, []);
         map.get(msg.runId)!.push(msg);
       }
     }
     return map;
-  }, [pipeline.messages]);
+  }, [messages]);
 
   // Show skeleton immediately if the store hasn't loaded data for this chatId yet.
   // This fires on the FIRST render (before any useEffect), so stale data from the

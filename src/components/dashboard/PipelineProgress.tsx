@@ -42,10 +42,6 @@ const RUNNING_STEPS = new Set<PipelineStep>([
   "generating_report", "answering",
 ]);
 
-const DONE_STEPS = new Set<PipelineStep>([
-  "ranked", "report_ready", "finalized",
-]);
-
 // Maps pipeline step id → icon for activity log
 const STEP_ICON: Record<string, React.ElementType> = {
   enriching:     Braces,
@@ -97,7 +93,6 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
   const isReportDone = step === "report_ready" || step === "finalized";
   const isReportRunning = step === "generating_report";
   // isDone for the header badge/progress bar: only true once report is ready too
-  const isDone = isReportDone;
 
   // Overall status label + colour
   const statusLabel = isError

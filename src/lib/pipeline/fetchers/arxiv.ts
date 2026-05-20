@@ -53,9 +53,6 @@ export async function fetchArxivPapers(query: string, maxResults: number): Promi
       ?? entry.match(/<link[^>]+href="([^"]+)"[^>]+title="pdf"/i);
     const pdfUrl = pdfMatch?.[1] ?? null;
 
-    // The <id> field is the canonical arXiv URL like http://arxiv.org/abs/2301.12345v1
-    const arxivId = idRaw?.split("/abs/").at(1) ?? null;
-
     papers.push({
       title: title ?? "Untitled arXiv paper",
       abstract: summary,
