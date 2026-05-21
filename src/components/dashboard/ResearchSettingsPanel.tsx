@@ -49,7 +49,7 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
   const isAllZero = weightSum === 0;
 
   return (
-    <section className="rounded-lg border border-secondary/10 bg-white p-5 shadow-ambient">
+    <section className="rounded-2xl border border-secondary/10 bg-white p-5 shadow-ambient">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="font-heading text-xl font-semibold text-on-surface">Research Settings</h2>

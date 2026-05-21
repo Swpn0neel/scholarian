@@ -2,7 +2,6 @@
 
 import { useRef, useMemo, useState } from "react";
 import { Send, Loader2, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useResearchStore, type QAMessage } from "@/hooks/useResearchStore";
 import { cn } from "@/lib/utils";
 
@@ -116,46 +115,73 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
           return;
         }
 
-        let comparisonText = "";
+        const compareMsgId = crypto.randomUUID();
+        const initialCompareMsg: QAMessage = {
+          id: compareMsgId,
+          question: trimmed,
+          answer: "",
+          index: useResearchStore.getState().messages.length + 1,
+          type: "compare",
+          createdAt: Date.now(),
+          runId: store.currentRunId,
+          isGenerating: true,
+        };
+        store.addMessage(initialCompareMsg);
         setStatus("comparing");
 
+        let comparisonText = "";
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let buf = "";
 
         if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const frames = buf.split("\n\n");
-            buf = frames.pop() ?? "";
-            for (const frame of frames) {
-              const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
-              const evLine = frame.split("\n").find((l) => l.startsWith("event:"));
-              if (dataLine && evLine?.includes("report")) {
-                try {
-                  const { chunk } = JSON.parse(dataLine.replace(/^data:\s*/, "")) as { chunk: string };
-                  comparisonText += chunk;
-                } catch { /* skip */ }
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const frames = buf.split("\n\n");
+              buf = frames.pop() ?? "";
+              for (const frame of frames) {
+                const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
+                const evLine = frame.split("\n").find((l) => l.startsWith("event:"));
+                if (evLine?.includes("reset")) {
+                  comparisonText = "";
+                  store.setMessages(
+                    useResearchStore.getState().messages.map((m) =>
+                      m.id === compareMsgId ? { ...m, answer: "" } : m
+                    )
+                  );
+                } else if (dataLine && evLine?.includes("report")) {
+                  try {
+                    const { chunk } = JSON.parse(dataLine.replace(/^data:\s*/, "")) as { chunk: string };
+                    comparisonText += chunk;
+                    store.setMessages(
+                      useResearchStore.getState().messages.map((m) =>
+                        m.id === compareMsgId ? { ...m, answer: comparisonText } : m
+                      )
+                    );
+                  } catch { /* skip */ }
+                }
               }
             }
+          } catch (err) {
+            console.error("Error reading comparison stream:", err);
+          } finally {
+            reader.releaseLock();
           }
         }
-        // NOTE: do NOT call store.setStep here — comparison must not
-        // affect the main ReportViewer or active pipeline state.
 
-        const compareMsg: QAMessage = {
-          id: crypto.randomUUID(),
-          question: trimmed,
-          answer: comparisonText || "Comparison generated.",
-          index: useResearchStore.getState().messages.length + 1,
-          type: "compare",
-          createdAt: Date.now(),
-          runId: store.currentRunId,
-        };
-        store.addMessage(compareMsg);
-        void persistMessage(chatId, store.currentRunId, trimmed, comparisonText, compareMsg.index, "compare");
+        const finalAnswer = comparisonText || "Comparison generated.";
+        store.setMessages(
+          useResearchStore.getState().messages.map((m) =>
+            m.id === compareMsgId
+              ? { ...m, answer: finalAnswer, isGenerating: false }
+              : m
+          )
+        );
+
+        void persistMessage(chatId, store.currentRunId, trimmed, finalAnswer, initialCompareMsg.index, "compare");
         return;
       }
 
@@ -302,7 +328,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "flex gap-3 rounded-xl border border-secondary/10 bg-white p-3 shadow-ambient transition-all",
+        "relative w-full",
         disabled && "opacity-60 pointer-events-none"
       )}
     >
@@ -312,23 +338,31 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
         onChange={(e) => setInput(e.target.value)}
         disabled={disabled || isLoading}
         placeholder={disabled ? "Session finalized" : placeholder}
-        className="h-11 flex-1 rounded-lg border border-secondary/10 bg-surface px-4 text-sm text-on-surface outline-none placeholder:text-secondary/40 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+        className="h-14 w-full rounded-full border border-secondary/15 bg-white pl-6 pr-16 text-[15px] text-on-surface shadow-[0_2px_12px_rgba(0,0,0,0.06)] outline-none placeholder:text-secondary/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/10 transition-all"
       />
-      <Button
+
+      {/* Send button — floats inside the pill on the right */}
+      <button
         type="submit"
         disabled={disabled || isLoading || !input.trim()}
-        className="h-11 min-w-[90px] rounded-lg bg-primary px-4 text-white"
+        aria-label="Send"
+        className={cn(
+          "absolute right-2.5 top-1/2 -translate-y-1/2 flex size-9 items-center justify-center rounded-full transition-all",
+          input.trim() && !isLoading
+            ? "bg-primary text-white shadow hover:bg-primary/90 hover:scale-105 active:scale-95"
+            : "bg-secondary/10 text-secondary/40 cursor-not-allowed"
+        )}
       >
         {isLoading ? (
           status === "refining" ? (
-            <><RefreshCw className="size-4 animate-spin" /> Refining…</>
+            <RefreshCw className="size-4 animate-spin" />
           ) : (
-            <><Loader2 className="size-4 animate-spin" /> Working…</>
+            <Loader2 className="size-4 animate-spin" />
           )
         ) : (
-          <><Send className="size-4" /> Send</>
+          <Send className="size-4 ml-0.5" />
         )}
-      </Button>
+      </button>
     </form>
   );
 }

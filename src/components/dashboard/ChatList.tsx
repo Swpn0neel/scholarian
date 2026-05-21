@@ -149,7 +149,7 @@ export function ChatList() {
             {editingId === chat.id ? (
               /* Rename form */
               <form
-                className="flex flex-1 items-center gap-1 px-2 py-1"
+                className="flex flex-1 min-w-0 items-center gap-1 px-2 py-1"
                 onSubmit={handleSubmitEdit}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -164,12 +164,12 @@ export function ChatList() {
                       void handleSubmitEdit(e);
                     }
                   }}
-                  className="h-8 flex-1 rounded bg-white px-2 text-sm text-on-surface outline-none ring-1 ring-secondary/15 focus:ring-primary/30"
+                  className="h-8 flex-1 min-w-0 rounded bg-white px-2 text-sm text-on-surface outline-none ring-1 ring-secondary/15 focus:ring-primary/30"
                   placeholder="Chat name"
                 />
                 <button
                   type="submit"
-                  className="rounded p-1 text-green-600 hover:bg-green-50"
+                  className="shrink-0 rounded p-1 text-green-600 hover:bg-green-50"
                   title="Save"
                 >
                   <Check className="size-3.5" />
@@ -177,7 +177,7 @@ export function ChatList() {
                 <button
                   type="button"
                   onClick={handleCancelEdit}
-                  className="rounded p-1 text-secondary hover:bg-secondary/10"
+                  className="shrink-0 rounded p-1 text-secondary hover:bg-secondary/10"
                   title="Cancel"
                 >
                   <X className="size-3.5" />
@@ -185,45 +185,45 @@ export function ChatList() {
               </form>
             ) : (
               /* Normal view */
-              <div className="flex items-center gap-2 px-2">
+              <div className="flex flex-1 min-w-0 items-center gap-2 px-2">
                 <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  if (chat.id === activeChatId || navigatingToId === chat.id) return;
-                  setNavigatingToId(chat.id);
-                  router.push(`/dashboard/${chat.id}`);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
                     if (chat.id === activeChatId || navigatingToId === chat.id) return;
                     setNavigatingToId(chat.id);
                     router.push(`/dashboard/${chat.id}`);
-                  }
-                }}
-                className={cn(
-                  "flex-1 cursor-pointer truncate py-2 text-sm transition-colors",
-                  isPendingDelete ? "text-red-700 font-medium" : "text-on-surface hover:text-primary"
-                )}
-              >
-                {isActuallyDeleting ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader2 className="size-3 animate-spin" />
-                    Deleting…
-                  </span>
-                ) : navigatingToId === chat.id ? (
-                  <span className="flex items-center gap-1.5 text-primary">
-                    <Loader2 className="size-3 animate-spin" />
-                    <span className="text-xs">Switching…</span>
-                  </span>
-                ) : (
-                  chat.title
-                )}
-              </div>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      if (chat.id === activeChatId || navigatingToId === chat.id) return;
+                      setNavigatingToId(chat.id);
+                      router.push(`/dashboard/${chat.id}`);
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 min-w-0 cursor-pointer truncate py-2 text-sm transition-colors",
+                    isPendingDelete ? "text-red-700 font-medium" : "text-on-surface hover:text-primary"
+                  )}
+                >
+                  {isActuallyDeleting ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="size-3 animate-spin" />
+                      Deleting…
+                    </span>
+                  ) : navigatingToId === chat.id ? (
+                    <span className="flex items-center gap-1.5 text-primary">
+                      <Loader2 className="size-3 animate-spin" />
+                      <span className="text-xs">Switching…</span>
+                    </span>
+                  ) : (
+                    chat.title
+                  )}
+                </div>
 
                 {/* Action buttons — visible on hover (or always when pending) */}
                 {!isPendingDelete && (
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       size="icon-xs"
                       variant="ghost"

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
-// import { enrichQuery } from "@/lib/pipeline/enrichQuery";
 import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -9,6 +8,7 @@ import { fetchArxivPapers } from "@/lib/pipeline/fetchers/arxiv";
 import { fetchSemanticScholarPapers } from "@/lib/pipeline/fetchers/semanticScholar";
 import { fetchSerpApiPapers } from "@/lib/pipeline/fetchers/serpapi";
 import type { RawPaper } from "@/types";
+import { calculateDynamicParams } from "@/lib/pipeline/score";
 
 const schema = z.object({
   chatId: z.string(),
@@ -42,17 +42,15 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Temporarily disabled: const enriched = await enrichQuery(settings.topic);
-        const enriched = settings.topic;
-        send(controller, "step", { step: "enriching", message: `Search query: "${enriched}"` });
+        const query = settings.topic;
 
-        send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${enriched}"...` });
+        send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${query}"...` });
         
         const perSource = Math.ceil(settings.maxPapers / 3);
         const [arxiv, semantic, serp] = await Promise.allSettled([
-          fetchArxivPapers(enriched, perSource),
-          fetchSemanticScholarPapers(enriched, perSource),
-          fetchSerpApiPapers(enriched, perSource),
+          fetchArxivPapers(query, perSource),
+          fetchSemanticScholarPapers(query, perSource),
+          fetchSerpApiPapers(query, perSource),
         ]);
       
         const arxivPapers = arxiv.status === "fulfilled" ? arxiv.value : [];
@@ -88,13 +86,17 @@ export async function POST(request: Request) {
 
         send(controller, "step", { step: "embedding", message: "Generating 768-dimensional semantic embeddings..." });
 
-        // Embed the enriched query so we can compute real cosine similarity
+        // Embed the query so we can compute real cosine similarity
         // against each paper's abstract embedding.
-        const queryEmbedding = await embedQuery(enriched);
+        const queryEmbedding = await embedQuery(query);
 
         send(controller, "step", { step: "embedding", message: "Embeddings complete. Comparing vector distances..." });
 
-        send(controller, "step", { step: "scoring", message: "Applying hybrid ranking (relevance × citation × recency)..." });
+        const { recencyWindow, recencyHalfLife } = calculateDynamicParams(deduped);
+        send(controller, "step", {
+          step: "scoring",
+          message: `Applying hybrid ranking (percentile-rank citations · recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`,
+        });
         const ranked = await rankPapers(deduped, settings, queryEmbedding);
         
         const runId = crypto.randomUUID();
@@ -132,11 +134,10 @@ export async function POST(request: Request) {
         // run is fully recoverable even if the user navigates away before the client
         // has a chance to call /api/pipeline/metadata.
         const pipelineEvents = [
-          { step: "enriching",     message: `Search query: "${enriched}"`,                                    ts: Date.now() - 6000 },
           { step: "fetching",      message: `Found ${arxivPapers.length} arXiv, ${semanticPapers.length} Semantic Scholar, and ${serpPapers.length} Google Scholar papers.`, ts: Date.now() - 5000 },
           { step: "deduplicating", message: `${raw.length} papers → ${deduped.length} unique after deduplication`, ts: Date.now() - 4000 },
           { step: "embedding",     message: "Embeddings complete. Comparing vector distances...",               ts: Date.now() - 3000 },
-          { step: "scoring",       message: "Applying hybrid ranking (relevance × citation × recency)...",     ts: Date.now() - 2000 },
+          { step: "scoring",       message: `Applying hybrid ranking (percentile-rank citations · recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`, ts: Date.now() - 2000 },
           { step: "ranked",        message: `Ranked ${ranked.length} papers by composite score.`,              ts: Date.now() - 1000 },
         ];
 

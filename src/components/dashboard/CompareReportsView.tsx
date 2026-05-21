@@ -2,7 +2,7 @@ import { GitCompareArrows } from "lucide-react";
 
 export function CompareReportsView() {
   return (
-    <section className="min-h-[70vh] rounded-lg border border-secondary/10 bg-white p-8 text-on-surface shadow-sm">
+    <section className="min-h-[70vh] rounded-2xl border border-secondary/10 bg-white p-8 text-on-surface shadow-sm">
       <div className="mb-8 flex items-center gap-3">
         <GitCompareArrows className="size-6 text-primary" />
         <h1 className="font-heading text-3xl font-semibold">Compare Reports</h1>

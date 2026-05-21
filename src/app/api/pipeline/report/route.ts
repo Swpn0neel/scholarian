@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildReportPrompt } from "@/lib/pipeline/report";
-import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
+import { executeGeminiStreamWithFallback } from "@/lib/pipeline/gemini";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { RankedPaper } from "@/types";
@@ -60,7 +60,7 @@ Write a well-structured report with these sections:
 1. Executive Summary (3–4 sentences)
 2. Background & Core Concepts
 3. Key Findings & Synthesis (discuss themes, consensus, and contradictions)
-4. Comparative Analysis (refer to specific papers by their rank number)
+4. Comparative Analysis (You MUST include a comprehensive Markdown comparison table comparing all the listed papers with each other. The table should have columns for: [Rank], Title, Authors & Year, Methodology/Approach, Key Findings/Results, and Main Strengths/Limitations. Follow the table with a comparative narrative referring to specific papers by [Rank].)
 5. Research Gaps & Open Questions
 6. Future Research Directions
 7. Conclusion
@@ -68,13 +68,7 @@ Write a well-structured report with these sections:
 
 Use markdown formatting. Be precise, analytical, and cite papers by [rank].`;
 
-  const result = await executeWithGeminiFallback(async (model) => {
-    return await model.generateContentStream(prompt);
-  }, "gemini-2.5-flash");
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) yield text;
-  }
+  yield* executeGeminiStreamWithFallback(prompt, "gemini-2.5-flash");
 }
 
 export async function POST(request: Request) {
@@ -133,6 +127,11 @@ export async function POST(request: Request) {
       try {
         let fullReport = "";
         for await (const chunk of streamGeminiReport(papers, topic)) {
+          if (chunk === "__STREAM_RESET__") {
+            fullReport = "";
+            send(controller, "reset", {});
+            continue;
+          }
           fullReport += chunk;
           send(controller, "report", { chunk });
         }

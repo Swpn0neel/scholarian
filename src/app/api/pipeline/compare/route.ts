@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
+import { executeGeminiStreamWithFallback } from "@/lib/pipeline/gemini";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -67,6 +67,9 @@ Generate a comprehensive comparison report in clean Markdown. Structure it as fo
 ## Overview
 Brief summary of what each report covers and the key differences in scope.
 
+## Comparison Summary Table
+You MUST include a structured Markdown comparison table that compares the two reports. The table should have columns for: [Feature/Aspect], [Report ${reportAIndex}], and [Report ${reportBIndex}]. The rows should cover key aspects such as: Focus/Objective, Key Methodology, Main Themes/Findings, Number of Papers Analyzed, Core Strengths, and Primary Gaps/Limitations.
+
 ## Methodology Comparison
 Compare the research approaches, scope, and focus areas.
 
@@ -89,16 +92,15 @@ Write in clear academic prose. Use **bold** for key terms. Keep the comparison b
       try {
         send(controller, "step", { step: "generating_report", message: "Generating comparison report…" });
 
-        const text = await executeWithGeminiFallback(async (model) => {
-          const result = await model.generateContent(prompt);
-          return result.response.text();
-        });
-
-        // Stream in chunks to match the existing SSE contract
-        const chunkSize = 200;
-        for (let i = 0; i < text.length; i += chunkSize) {
-          send(controller, "report", { chunk: text.slice(i, i + chunkSize) });
-          await new Promise((r) => setTimeout(r, 10));
+        let fullReport = "";
+        for await (const chunk of executeGeminiStreamWithFallback(prompt)) {
+          if (chunk === "__STREAM_RESET__") {
+            fullReport = "";
+            send(controller, "reset", {});
+            continue;
+          }
+          fullReport += chunk;
+          send(controller, "report", { chunk });
         }
 
         // Save comparison to reports table
@@ -106,7 +108,7 @@ Write in clear academic prose. Use **bold** for key terms. Keep the comparison b
           .from("reports")
           .insert({
             chat_id: chatId,
-            content_md: text,
+            content_md: fullReport,
             type: "comparison",
           })
           .select("id")

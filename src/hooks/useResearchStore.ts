@@ -21,6 +21,7 @@ export interface QAMessage {
   /** Only for type='report' — the ranked papers used to generate it */
   reportPapers?: import("@/types").RankedPaper[];
   reportTopK?: number;
+  isGenerating?: boolean;
 }
 
 /** A snapshot of a completed research run (used when refining) */

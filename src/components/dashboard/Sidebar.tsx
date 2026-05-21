@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { GripVertical, LogOut, Sparkles } from "lucide-react";
+import { GripVertical, LogOut, Sparkles, PanelLeftClose, PanelLeftOpen, Menu } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ChatList } from "./ChatList";
 import { NewChatButton } from "./NewChatButton";
 import { useChatSync } from "@/hooks/useChat";
 
 
-export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
+export function Sidebar() {
   useChatSync(); // load + realtime-subscribe once for the whole dashboard
   const [userName, setUserName] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -28,10 +30,10 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
     });
   }, []);
 
-  // Update CSS variable when sidebar width changes
+  // Update CSS variable when sidebar width changes or when collapsed
   useEffect(() => {
-    document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
-  }, [sidebarWidth]);
+    document.documentElement.style.setProperty("--sidebar-width", isDesktopCollapsed ? "0px" : `${sidebarWidth}px`);
+  }, [sidebarWidth, isDesktopCollapsed]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -76,11 +78,43 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
 
   return (
     <>
+      {/* Floating expand button for desktop */}
+      {isDesktopCollapsed && (
+        <button
+          onClick={() => setIsDesktopCollapsed(false)}
+          className="fixed top-4 left-4 z-40 hidden lg:flex size-10 items-center justify-center rounded-lg bg-surface shadow-md border border-secondary/10 text-secondary hover:text-primary transition-all"
+          aria-label="Expand sidebar"
+        >
+          <PanelLeftOpen className="size-5" />
+        </button>
+      )}
+
+      {/* Mobile Top Navbar */}
+      <header className="fixed top-0 left-0 right-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-secondary/10 bg-surface/95 backdrop-blur-sm px-4 shadow-sm lg:hidden">
+        <button
+          type="button"
+          className="-m-2.5 p-2.5 text-secondary hover:text-on-surface"
+          onClick={() => setIsMobileOpen(true)}
+        >
+          <span className="sr-only">Open sidebar</span>
+          <Menu className="h-6 w-6" aria-hidden="true" />
+        </button>
+        <div className="flex flex-1 items-center gap-x-4 justify-between lg:justify-end">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-white">
+              <Sparkles className="size-4" />
+            </div>
+            <span className="font-heading text-lg font-semibold text-on-surface">Scholarian</span>
+          </Link>
+          <div className="w-10" />
+        </div>
+      </header>
+
       {/* Mobile Backdrop */}
-      {isOpen && (
+      {isMobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity"
-          onClick={onClose}
+          onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
         />
       )}
@@ -88,19 +122,29 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
       <aside
           ref={sidebarRef}
           style={{ width: sidebarWidth }}
-          className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-secondary/10 bg-surface-container-lowest transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-            isOpen ? "translate-x-0" : "-translate-x-full"
-          } ${isResizing ? "select-none" : ""}`}
+          className={`fixed inset-y-0 left-0 z-50 flex flex-col max-w-[calc(100vw-3rem)] border-r border-secondary/10 bg-surface-container-lowest transition-transform duration-300 ease-in-out ${
+            isMobileOpen ? "translate-x-0" : "-translate-x-full"
+          } ${isDesktopCollapsed ? "lg:-translate-x-full" : "lg:translate-x-0"} ${isResizing ? "select-none" : ""}`}
         >
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="p-4 pb-0">
+            <div className="p-4 pb-0 flex items-center justify-between">
               <Link href="/" className="mb-4 flex items-center gap-2 px-2">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-white">
                   <Sparkles className="size-4" />
                 </div>
                 <span className="font-heading text-lg font-semibold text-on-surface">Scholarian</span>
               </Link>
+              <button 
+                onClick={() => {
+                  if (window.innerWidth >= 1024) setIsDesktopCollapsed(true);
+                  else setIsMobileOpen(false);
+                }}
+                className="mb-4 flex size-10 items-center justify-center rounded-md text-secondary hover:bg-surface-container-low hover:text-on-surface transition-colors"
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="size-5" />
+              </button>
             </div>
 
             {/* User Greeting */}
@@ -151,15 +195,17 @@ export function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () =>
         </aside>
 
         {/* Resize Handle (Desktop Only) */}
-        <div
-          onMouseDown={handleResizeStart}
-          className={`fixed inset-y-0 left-0 z-50 hidden lg:block w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${isResizing ? "bg-primary/50" : "bg-transparent"}`}
-          style={{ width: 8, transform: `translateX(${sidebarWidth - 4}px)` }}
-        >
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
-            <GripVertical className="size-4 text-primary" />
+        {!isDesktopCollapsed && (
+          <div
+            onMouseDown={handleResizeStart}
+            className={`fixed inset-y-0 left-0 z-50 hidden lg:block w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${isResizing ? "bg-primary/50" : "bg-transparent"}`}
+            style={{ width: 8, transform: `translateX(${sidebarWidth - 4}px)` }}
+          >
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity">
+              <GripVertical className="size-4 text-primary" />
+            </div>
           </div>
-        </div>
+        )}
     </>
   );
 }

@@ -1,6 +1,5 @@
 export type PipelineStep =
   | "idle"
-  | "enriching"
   | "fetching"
   | "deduplicating"
   | "embedding"

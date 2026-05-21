@@ -54,15 +54,17 @@ function stripMarkdown(md: string): string {
 // Split stripped text into typed blocks for structured PDF rendering
 // ---------------------------------------------------------------------------
 interface Block {
-  type: "heading" | "body";
+  type: "heading" | "body" | "table";
   level?: number; // 1-6 for headings
-  text: string;
+  text?: string;
+  tableData?: string[][]; // For tables: outer array = rows, inner array = cells
 }
 
 function parseBlocks(plainText: string): Block[] {
   const lines = plainText.split("\n");
   const blocks: Block[] = [];
   let bodyBuffer: string[] = [];
+  let currentTableRows: string[][] = [];
 
   function flushBody() {
     const text = bodyBuffer.join("\n").trim();
@@ -70,21 +72,48 @@ function parseBlocks(plainText: string): Block[] {
     bodyBuffer = [];
   }
 
-  // After stripMarkdown, headings are already plain lines but we re-detect them
-  // from the original markdown structure. Since we call this with the raw markdown,
-  // we handle both pathways.
-  for (const line of lines) {
-    const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
-    if (headingMatch) {
-      flushBody();
-      blocks.push({ type: "heading", level: headingMatch[1].length, text: headingMatch[2].trim() });
-    } else if (line.trim() === "") {
-      bodyBuffer.push("");
-    } else {
-      bodyBuffer.push(line);
+  function flushTable() {
+    if (currentTableRows.length > 0) {
+      // Filter out separator row (like | --- | --- |)
+      const cleanRows = currentTableRows.filter(row => {
+        const combined = row.join("").trim();
+        return !/^[:\-\s|]+$/.test(combined) && combined.length > 0;
+      });
+      
+      if (cleanRows.length > 0) {
+        blocks.push({ type: "table", tableData: cleanRows });
+      }
+      currentTableRows = [];
     }
   }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isTableRow = trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.length > 1;
+
+    if (isTableRow) {
+      flushBody();
+      const cells = trimmed
+        .split("|")
+        .slice(1, -1)
+        .map(cell => cell.trim());
+      currentTableRows.push(cells);
+    } else {
+      flushTable();
+      const headingMatch = /^(#{1,6})\s+(.+)$/.exec(line);
+      if (headingMatch) {
+        flushBody();
+        blocks.push({ type: "heading", level: headingMatch[1].length, text: headingMatch[2].trim() });
+      } else if (trimmed === "") {
+        bodyBuffer.push("");
+      } else {
+        bodyBuffer.push(line);
+      }
+    }
+  }
+
   flushBody();
+  flushTable();
   return blocks;
 }
 
@@ -279,6 +308,73 @@ function PaperTable({ papers, topK }: { papers: RankedPaper[]; topK: number }) {
   );
 }
 
+function MarkdownTable({ data }: { data: string[][] }) {
+  if (data.length === 0) return null;
+
+  const headerRow = data[0]!;
+  const bodyRows = data.slice(1);
+  const colCount = headerRow.length;
+
+  // Heuristic column widths
+  let colWidths: string[] = [];
+  if (colCount === 6) {
+    colWidths = ["8%", "20%", "15%", "19%", "19%", "19%"];
+  } else if (colCount === 5) {
+    colWidths = ["8%", "25%", "22%", "22%", "23%"];
+  } else if (colCount === 3) {
+    colWidths = ["20%", "40%", "40%"];
+  } else {
+    colWidths = Array(colCount).fill(`${100 / colCount}%`);
+  }
+
+  return (
+    <View style={styles.table} wrap={false}>
+      {/* Header */}
+      <View style={styles.tableHeaderRow}>
+        {headerRow.map((cellText, idx) => (
+          <View 
+            key={idx} 
+            style={{ 
+              width: colWidths[idx] || `${100 / colCount}%`, 
+              paddingHorizontal: 4,
+              paddingVertical: 4
+            }}
+          >
+            <Text style={styles.thText}>{cellText}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Rows */}
+      {bodyRows.map((row, rowIdx) => (
+        <View
+          key={rowIdx}
+          style={[
+            styles.tableRow,
+            rowIdx % 2 === 1 ? styles.tableRowAlt : {}
+          ]}
+          wrap={false}
+        >
+          {row.map((cellText, colIdx) => (
+            <View
+              key={colIdx}
+              style={{
+                width: colWidths[colIdx] || `${100 / colCount}%`,
+                paddingHorizontal: 4,
+                paddingVertical: 4
+              }}
+            >
+              <Text style={styles.tdText}>
+                {stripMarkdown(cellText)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ReportBody({ markdown }: { markdown: string }) {
   const blocks = parseBlocks(markdown);
 
@@ -294,8 +390,11 @@ function ReportBody({ markdown }: { markdown: string }) {
             </Text>
           );
         }
+        if (block.type === "table") {
+          return <MarkdownTable key={i} data={block.tableData!} />;
+        }
         // Strip inline markdown tokens from body text before rendering
-        const clean = stripMarkdown(block.text);
+        const clean = stripMarkdown(block.text || "");
         if (!clean) return null;
         return (
           <Text key={i} style={styles.bodyText}>
@@ -309,12 +408,12 @@ function ReportBody({ markdown }: { markdown: string }) {
 
 function ResearchReportPDF({
   report,
-  papers,
-  topK,
+  papers = [],
+  topK = 10,
 }: {
   report: string;
-  papers: RankedPaper[];
-  topK: number;
+  papers?: RankedPaper[];
+  topK?: number;
 }) {
   const generatedAt = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -366,17 +465,31 @@ function ResearchReportPDF({
 // ---------------------------------------------------------------------------
 export function PDFDownloadButton({
   report,
-  papers,
-  topK,
+  papers = [],
+  topK = 10,
   isGenerating,
+  variant = "default",
 }: {
   report: string;
-  papers: RankedPaper[];
-  topK: number;
+  papers?: RankedPaper[];
+  topK?: number;
   isGenerating: boolean;
+  variant?: "default" | "compact";
 }) {
   // Show a disabled "Generating report…" state while the SSE stream is open
   if (isGenerating || !report) {
+    if (variant === "compact") {
+      return (
+        <button
+          type="button"
+          disabled
+          className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/50 cursor-not-allowed opacity-60"
+        >
+          <Loader2 className="size-3 animate-spin" />
+          Generating…
+        </button>
+      );
+    }
     return (
       <Button
         variant="outline"
@@ -389,30 +502,46 @@ export function PDFDownloadButton({
     );
   }
 
+  const isComparison = papers.length === 0;
+
   return (
     <PDFDownloadLink
       document={<ResearchReportPDF report={report} papers={papers} topK={topK} />}
-      fileName="scholarian-report.pdf"
+      fileName={isComparison ? "scholarian-comparison.pdf" : "scholarian-report.pdf"}
     >
-      {({ loading }) => (
-        <Button
-          variant="outline"
-          disabled={loading}
-          className="h-10 border-secondary/10 bg-white text-primary hover:bg-surface"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Preparing PDF…
-            </>
-          ) : (
-            <>
-              <Download className="size-4" />
-              Download PDF
-            </>
-          )}
-        </Button>
-      )}
+      {({ loading }) => {
+        if (variant === "compact") {
+          return (
+            <button
+              type="button"
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-white/30 disabled:opacity-60"
+            >
+              {loading ? <Loader2 className="size-3 animate-spin" /> : <Download className="size-3" />}
+              {loading ? "Preparing…" : "Download PDF"}
+            </button>
+          );
+        }
+        return (
+          <Button
+            variant="outline"
+            disabled={loading}
+            className="h-10 border-secondary/10 bg-white text-primary hover:bg-surface"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Preparing PDF…
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Download PDF
+              </>
+            )}
+          </Button>
+        );
+      }}
     </PDFDownloadLink>
   );
 }

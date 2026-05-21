@@ -11,6 +11,8 @@ import {
   FileText,
   Maximize2,
   Minimize2,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { RankedPaper } from "@/types";
@@ -26,6 +28,10 @@ interface ReportViewerProps {
   papers?: RankedPaper[];
   topK?: number;
   isGenerating?: boolean;
+  title?: string;
+  subtitle?: string;
+  headerBg?: string;
+  icon?: LucideIcon;
 }
 
 // Compact word-count estimate for the meta bar
@@ -50,6 +56,10 @@ export function ReportViewer({
   papers = [],
   topK = 10,
   isGenerating = false,
+  title = "Research Report",
+  subtitle,
+  headerBg = "bg-gradient-to-r from-primary to-primary-container",
+  icon: Icon = BookOpen,
 }: ReportViewerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -92,17 +102,32 @@ export function ReportViewer({
 
   return (
     <>
-      {/* True Fullscreen covers the entire viewport */}
+      {/* Backdrop for overlay mode */}
+      {isFullscreen && (
+        <>
+          <div 
+            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsFullscreen(false)}
+          />
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="fixed top-6 right-6 md:top-8 md:right-8 z-[70] flex size-11 items-center justify-center rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] text-secondary hover:text-on-surface hover:scale-105 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
+            aria-label="Close overlay"
+          >
+            <X className="size-5" />
+          </button>
+        </>
+      )}
 
       <section
         className={
           isFullscreen
-            ? "fixed inset-0 z-50 overflow-auto bg-white transition-all duration-300"
-            : "rounded-xl border border-secondary/10 bg-white shadow-ambient transition-all duration-300"
+            ? "fixed inset-4 md:inset-y-8 lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-5xl z-[65] overflow-auto rounded-2xl bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 animate-in fade-in zoom-in-[0.98] duration-200 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-secondary/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-secondary/20"
+            : "rounded-2xl border border-secondary/10 bg-white shadow-ambient transition-all duration-300"
         }
       >
         {/* ── Header ─────────────────────────────────────────────── */}
-        <div className={`relative overflow-hidden border-b border-secondary/10 bg-gradient-to-r from-primary to-primary-container px-6 py-5 ${isFullscreen ? "" : "rounded-t-xl"}`}>
+        <div className={`relative overflow-hidden border-b border-secondary/10 px-6 py-5 ${headerBg} ${isFullscreen ? "" : "rounded-t-2xl"}`}>
           {/* Decorative background circles */}
           <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-white/5" />
           <div className="pointer-events-none absolute -right-2 bottom-0 size-20 rounded-full bg-white/5" />
@@ -110,32 +135,34 @@ export function ReportViewer({
           <div className="relative flex flex-col sm:flex-row sm:items-center items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-                <BookOpen className="size-5 text-white" />
+                <Icon className="size-5 text-white" />
               </div>
               <div>
                 <h2 className="font-heading text-lg font-semibold leading-tight text-white">
-                  Research Report
+                  {title}
                 </h2>
                 <p className="mt-0.5 text-xs text-blue-200">
-                  AI-synthesized from top {topK} papers
+                  {subtitle || `AI-synthesized from top ${topK} papers`}
                 </p>
               </div>
             </div>
 
             <div className="flex shrink-0 items-center gap-2 w-full sm:w-auto justify-end">
-              {/* Fullscreen toggle */}
+              {/* Fullscreen toggle & Close */}
               {markdown && (
-                <button
-                  onClick={() => setIsFullscreen((f) => !f)}
-                  className="rounded-lg p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
-                  aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="size-4" />
-                  ) : (
-                    <Maximize2 className="size-4" />
-                  )}
-                </button>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => setIsFullscreen((f) => !f)}
+                    className="rounded-lg p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+                    aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  >
+                    {isFullscreen ? (
+                      <Minimize2 className="size-4" />
+                    ) : (
+                      <Maximize2 className="size-4" />
+                    )}
+                  </button>
+                </div>
               )}
               <PDFDownloadButton
                 report={markdown}

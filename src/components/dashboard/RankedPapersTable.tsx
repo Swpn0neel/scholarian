@@ -34,6 +34,46 @@ export function RankedPapersTable({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedPaper, setSelectedPaper] = useState<RankedPaper | null>(null);
 
+  const dynamicParams = useMemo(() => {
+    if (papers.length === 0) return null;
+
+    const currentYear = new Date().getFullYear();
+
+    // Mirror score.ts: sorted cit/yr array for percentile rank scoring
+    const citPerYearSorted = papers
+      .map((p) => {
+        const age = p.year ? Math.max(1, currentYear - p.year) : 1;
+        return p.citationCount / age;
+      })
+      .sort((a, b) => a - b);
+
+    // Mirror score.ts: recency window from cohort age span
+    const years = papers.map((p) => p.year).filter((y): y is number => typeof y === "number" && y > 0);
+    let recencyWindow = 12;
+    if (years.length > 0) {
+      const minYear = Math.min(...years);
+      recencyWindow = Math.max(3, Math.min(25, currentYear - minYear));
+    }
+
+    // Dynamic half-life = half the window, clamped 2 – 12 yr
+    const recencyHalfLife = Math.max(2, Math.min(12, recencyWindow / 2));
+
+    // Helper: compute the cohort percentile rank for a given paper
+    function cohortPercentile(citationCount: number, year: number | null): number {
+      if (citPerYearSorted.length === 0) return 0;
+      const age = year ? Math.max(1, currentYear - year) : 1;
+      const citPerYear = citationCount / age;
+      let rank = 0;
+      for (const v of citPerYearSorted) {
+        if (v < citPerYear) rank++;
+        else break;
+      }
+      return rank / citPerYearSorted.length;
+    }
+
+    return { citPerYearSorted, recencyWindow, recencyHalfLife, cohortPercentile };
+  }, [papers]);
+
   // Close drawer on ESC key (#19)
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -72,11 +112,13 @@ export function RankedPapersTable({
 
 
   return (
-    <section className="rounded-lg border border-secondary/10 bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-secondary/10 bg-white p-5 shadow-sm">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-lg font-semibold text-on-surface">Ranked Papers</h2>
-          <p className="text-sm text-secondary">Top {topK} highlighted for report generation.</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-secondary">
+            <span>Top {topK} highlighted for report generation.</span>
+          </div>
         </div>
         <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
           Generate Report
@@ -160,11 +202,43 @@ export function RankedPapersTable({
             <h3 className="font-heading text-2xl font-semibold">{selectedPaper.title}</h3>
             <p className="mt-3 text-sm text-secondary">{selectedPaper.authors.join(", ") || "Unknown authors"}</p>
             <p className="mt-6 text-sm leading-7 text-on-surface">{selectedPaper.abstract ?? "No abstract available."}</p>
-            <div className="mt-6 space-y-2 text-sm text-secondary">
+            <div className="mt-6 space-y-3 rounded-lg bg-surface-container-low p-4 border border-secondary/5 text-sm text-secondary">
+              <div className="font-heading text-xs uppercase tracking-[0.1em] text-secondary/70 font-bold">Scoring Breakdown</div>
+              <div className="grid grid-cols-2 gap-y-2.5 mt-2">
+                <div>Relevance Score:</div>
+                <div className="font-semibold text-on-surface text-right">
+                  {(selectedPaper.simScore ?? 0).toFixed(3)}{" "}
+                  <span className="text-xs font-normal text-secondary/65">(quality-adjusted)</span>
+                </div>
+
+                <div>Citation Score:</div>
+                <div className="font-semibold text-on-surface text-right">
+                  {(selectedPaper.citationScore ?? 0).toFixed(3)}{" "}
+                  <span className="text-xs font-normal text-secondary/65">
+                    ({Math.round((dynamicParams?.cohortPercentile(selectedPaper.citationCount, selectedPaper.year ?? null) ?? 0) * 100)}th pct of cohort)
+                  </span>
+                </div>
+
+                <div>Recency Score:</div>
+                <div className="font-semibold text-on-surface text-right">
+                  {(selectedPaper.recencyScore ?? 0).toFixed(3)}{" "}
+                  <span className="text-xs font-normal text-secondary/65">
+                    (half-life: {dynamicParams?.recencyHalfLife ?? 5} yrs)
+                  </span>
+                </div>
+
+                <div className="border-t border-secondary/15 pt-2 font-semibold text-on-surface">Final Score (with source credibility):</div>
+                <div className="border-t border-secondary/15 pt-2 font-bold text-tertiary text-base text-right">
+                  {(selectedPaper.finalScore ?? 0).toFixed(3)}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-2 text-sm text-secondary border-t border-secondary/10 pt-4">
               <div>Venue: {selectedPaper.venue ?? "n/a"}</div>
               <div>DOI: {selectedPaper.doi ?? "n/a"}</div>
               <div>Citations: {selectedPaper.citationCount}</div>
-              <div>Final Score: <span className="font-semibold text-tertiary">{(selectedPaper.finalScore ?? 0).toFixed(3)}</span></div>
+              <div>Year: {selectedPaper.year ?? "n/a"}</div>
             </div>
             {(selectedPaper.pdfUrl || selectedPaper.url) && (
               <a

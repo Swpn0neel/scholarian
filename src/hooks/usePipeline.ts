@@ -9,6 +9,7 @@ type StreamEvent =
   | { event: "papers"; data: RankedPaper[] }
   | { event: "report"; data: { chunk: string } }
   | { event: "done"; data: { runId?: string; reportId?: string; content?: string } }
+  | { event: "reset"; data?: Record<string, never> }
   | { event: "error"; data: { message: string } };
 
 async function readSseResponse(response: Response, onEvent: (event: StreamEvent) => void) {
@@ -229,7 +230,7 @@ export function usePipeline(chatId: string) {
 
   async function runResearch(settings: ResearchSettings, excludeTitles?: string[]) {
     store.archiveAndReset();
-    store.setStep("enriching", "Preparing research run…");
+    store.setStep("fetching", "Preparing research run…");
 
     if (settings.topic.trim()) {
       const raw = settings.topic.trim();
@@ -316,6 +317,9 @@ export function usePipeline(chatId: string) {
     });
     if (!response.ok) { store.setStep("error", `Report request failed: ${response.statusText}`); return; }
     await readSseResponse(response, (message) => {
+      if (message.event === "reset") {
+        store.clearReport();
+      }
       if (message.event === "report") store.appendReportMarkdown(message.data.chunk);
       if (message.event === "done") {
         store.setStep("report_ready", "Report ready.");
@@ -375,6 +379,9 @@ export function usePipeline(chatId: string) {
     });
     if (!response.ok) { store.setStep("error", "Comparison failed."); throw new Error("Comparison failed"); }
     await readSseResponse(response, (message) => {
+      if (message.event === "reset") {
+        text = "";
+      }
       if (message.event === "report") text += message.data.chunk;
       if (message.event === "done") store.setStep("report_ready", "Comparison ready.");
       if (message.event === "error") store.setStep("error", message.data.message);

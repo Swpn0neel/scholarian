@@ -6,7 +6,6 @@ import {
   Circle,
   Loader2,
   XCircle,
-  Braces,
   Search,
   Layers,
   Cpu,
@@ -28,7 +27,6 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { id: "enriching",     label: "Enrich",    sublabel: "Query expansion",   Icon: Braces    },
   { id: "fetching",      label: "Fetch",     sublabel: "Multi-source",      Icon: Search    },
   { id: "deduplicating", label: "Dedupe",    sublabel: "Unique papers",     Icon: Layers    },
   { id: "embedding",     label: "Embed",     sublabel: "Semantic vectors",  Icon: Cpu       },
@@ -38,13 +36,12 @@ const STAGES: Stage[] = [
 ];
 
 const RUNNING_STEPS = new Set<PipelineStep>([
-  "enriching", "fetching", "deduplicating", "embedding", "scoring",
+  "fetching", "deduplicating", "embedding", "scoring",
   "generating_report", "answering",
 ]);
 
 // Maps pipeline step id → icon for activity log
 const STEP_ICON: Record<string, React.ElementType> = {
-  enriching:     Braces,
   fetching:      Search,
   deduplicating: Layers,
   embedding:     Cpu,
@@ -108,7 +105,7 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
     : "Ready";
 
   return (
-    <section className="overflow-hidden rounded-xl border border-secondary/10 bg-white shadow-ambient">
+    <section className="overflow-hidden rounded-2xl border border-secondary/10 bg-white shadow-ambient">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b border-secondary/10 px-5 py-3.5">
@@ -166,7 +163,7 @@ export function PipelineProgress({ step, events, isRunning }: PipelineProgressPr
             />
           )}
 
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-6 gap-2">
           {STAGES.map((stage, idx) => {
             const isReportStage = stage.id === "generating_report";
 

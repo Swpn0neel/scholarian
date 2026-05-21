@@ -31,14 +31,13 @@ export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: P
   const displayEvents = run.events.length > 0
     ? run.events
     : [
-        { step: "enriching" as PipelineStep, message: "Query enriched.", ts: run.completedAt - 5000 },
         { step: "fetching" as PipelineStep, message: `Fetched ${paperCount} papers.`, ts: run.completedAt - 4000 },
         { step: "ranked" as PipelineStep, message: `Ranked ${paperCount} papers by composite score.`, ts: run.completedAt - 1000 },
         ...(hasReport ? [{ step: "report_ready" as PipelineStep, message: "Report saved.", ts: run.completedAt }] : []),
       ];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-secondary/15 shadow-ambient">
+    <div className="overflow-hidden rounded-2xl border border-secondary/15 shadow-ambient">
       {/* ── Run header ── */}
       <div className="flex items-center gap-3 bg-gradient-to-r from-surface-container to-surface-container-low px-5 py-4 border-b border-secondary/10">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
