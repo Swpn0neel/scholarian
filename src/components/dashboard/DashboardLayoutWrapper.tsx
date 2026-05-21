@@ -1,8 +1,3 @@
-"use client";
-
-import { useState } from "react";
-import { Menu, Sparkles } from "lucide-react";
-import Link from "next/link";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 
 export function DashboardLayoutWrapper({ children }: { children: React.ReactNode }) {
