@@ -55,6 +55,7 @@
 }
 
 :root {
+  --sidebar-width: 280px;
   --background: #f8f9fb;
   --foreground: #191c1e;
   --card: #ffffff;

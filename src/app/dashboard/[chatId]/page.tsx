@@ -19,37 +19,83 @@ function ChatLoadingState() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
-          <div className="h-8 w-64 rounded-lg bg-secondary/10" />
-          <div className="h-4 w-40 rounded bg-secondary/8" />
+          <div className="h-9 w-72 rounded-lg bg-secondary/10" />
+          <div className="h-4 w-48 rounded bg-secondary/8" />
         </div>
       </div>
 
-      {/* Settings panel skeleton */}
-      <div className="rounded-lg border border-secondary/10 bg-white p-5 shadow-ambient space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Research Settings panel skeleton — mirrors ResearchSettingsPanel exactly */}
+      <div className="rounded-2xl border border-secondary/10 bg-white p-5 shadow-ambient space-y-4">
+        {/* Header row: title + subtitle + icon */}
+        <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="h-6 w-44 rounded bg-secondary/10" />
-            <div className="h-4 w-64 rounded bg-secondary/8" />
+            <div className="h-4 w-72 rounded bg-secondary/8" />
           </div>
-          <div className="size-5 rounded bg-secondary/8" />
+          <div className="size-5 rounded bg-secondary/8 shrink-0 mt-0.5" />
         </div>
-        <div className="h-28 w-full rounded-lg bg-secondary/8" />
+
+        {/* Topic label + textarea */}
+        <div className="space-y-2">
+          <div className="h-3 w-12 rounded bg-secondary/10" />
+          <div className="h-28 w-full rounded-lg bg-secondary/8" />
+        </div>
+
+        {/* 2-col: Max Papers + Top K steppers */}
         <div className="grid grid-cols-2 gap-3">
           <div className="h-16 rounded-lg bg-secondary/8" />
           <div className="h-16 rounded-lg bg-secondary/8" />
         </div>
+
+        {/* 3-col: Relevance, Citation, Recency weight inputs */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="h-14 rounded-lg bg-secondary/8" />
-          <div className="h-14 rounded-lg bg-secondary/8" />
-          <div className="h-14 rounded-lg bg-secondary/8" />
+          <div className="h-16 rounded-lg bg-secondary/8" />
+          <div className="h-16 rounded-lg bg-secondary/8" />
+          <div className="h-16 rounded-lg bg-secondary/8" />
+        </div>
+
+        {/* Footer: weight sum label + Run Research button */}
+        <div className="flex items-center justify-between border-t border-secondary/10 pt-4">
+          <div className="h-3.5 w-32 rounded bg-secondary/8" />
+          <div className="h-10 w-32 rounded-lg bg-secondary/10" />
         </div>
       </div>
 
-      {/* Pipeline rail skeleton */}
-      <div className="rounded-lg border border-secondary/10 bg-white p-4 shadow-ambient">
-        <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-secondary/8" />
+      {/* Research Pipeline panel skeleton — mirrors PipelineProgress exactly */}
+      <div className="overflow-hidden rounded-2xl border border-secondary/10 bg-white shadow-ambient">
+        {/* Header bar: dot + title + status badge */}
+        <div className="flex items-center justify-between border-b border-secondary/10 px-5 py-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="size-2.5 rounded-full bg-secondary/10" />
+            <div className="h-4 w-36 rounded bg-secondary/10" />
+          </div>
+          <div className="h-5 w-16 rounded-full bg-secondary/10" />
+        </div>
+
+        {/* Stage rail: 6 cells each with icon circle + label + sublabel */}
+        <div className="border-b border-secondary/10 px-5 py-4">
+          <div className="grid grid-cols-6 gap-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center gap-2 px-2 py-3">
+                {/* Icon circle */}
+                <div className="size-16 rounded-full bg-secondary/8" />
+                {/* Label */}
+                <div className="h-3.5 w-10 rounded bg-secondary/10" />
+                {/* Sublabel */}
+                <div className="h-3 w-14 rounded bg-secondary/8" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Activity log skeleton — a few log line placeholders */}
+        <div className="px-5 py-3 space-y-2.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <div className="size-3 rounded-full bg-secondary/8 shrink-0" />
+              <div className="h-3 w-20 rounded bg-secondary/8 shrink-0" />
+              <div className="h-3 rounded bg-secondary/8" style={{ width: `${55 + i * 8}%` }} />
+            </div>
           ))}
         </div>
       </div>
@@ -108,7 +154,15 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
   // This fires on the FIRST render (before any useEffect), so stale data from the
   // previous chat never bleeds through for even a single frame.
   const isStale = pipeline.loadedChatId !== chatId;
-  if (isStale || pipeline.isLoadingHistory) return <ChatLoadingState />;
+  if (isStale || pipeline.isLoadingHistory) return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 pb-6 space-y-5">
+          <ChatLoadingState />
+        </div>
+      </div>
+    </div>
+  );
 
   const DEFAULT_TITLES = new Set(["new research chat", "untitled research chat"]);
   const displayTitle =
@@ -159,7 +213,7 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
             <div className="space-y-6">
               {pipeline.completedRuns.map((run, i) => {
                 let runMsgs = messagesByRunId.get(run.runId!) ?? [];
-                
+
                 // Backward compatibility: Synthesize report message if run has report but no report message
                 if (run.reportMarkdown && !runMsgs.some(m => m.type === "report" && m.answer === run.reportMarkdown)) {
                   runMsgs = [
@@ -187,7 +241,7 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
                       )}
                       {/* Connector between runs */}
                       <div className="flex items-center gap-3 px-4 pt-3">
-                        <div className="h-6 w-px bg-gradient-to-b from-secondary/20 to-primary/30 ml-4" />
+                        <div className="h-6 w-px bg-linear-to-b from-secondary/20 to-primary/30 ml-4" />
                         <span className="text-[10px] font-semibold uppercase tracking-widest text-primary/50">
                           Refined →
                         </span>
@@ -281,9 +335,8 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
         <div className="relative shrink-0">
           {/* Scroll-to-bottom arrow — floats above the bar when not at bottom */}
           <div
-            className={`absolute -top-14 left-1/2 -translate-x-1/2 z-10 transition-all duration-300 ${
-              isAtBottom ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100 translate-y-0"
-            }`}
+            className={`absolute -top-14 left-1/2 -translate-x-1/2 z-10 transition-all duration-300 ${isAtBottom ? "opacity-0 pointer-events-none translate-y-2" : "opacity-100 translate-y-0"
+              }`}
           >
             <button
               onClick={scrollToBottom}
@@ -296,9 +349,8 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
 
           {/* Bar — free-floating, shadow fades in when scrolled up */}
           <div
-            className={`bg-surface/80 backdrop-blur-md transition-all duration-300 ${
-              !isAtBottom ? "shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.07)]" : ""
-            }`}
+            className={`bg-surface/80 backdrop-blur-md transition-all duration-300 ${!isAtBottom ? "shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.07)]" : ""
+              }`}
           >
             <div className="mx-auto max-w-4xl px-4 py-4 md:px-8">
               <FeedbackInput

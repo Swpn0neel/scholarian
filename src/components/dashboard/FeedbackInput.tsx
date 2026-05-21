@@ -360,7 +360,7 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
             <Loader2 className="size-4 animate-spin" />
           )
         ) : (
-          <Send className="size-4 ml-0.5" />
+          <Send className="size-4" />
         )}
       </button>
     </form>
