@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState } from "react";
-import { ArrowDownUp, ArrowDown, ArrowUp, ExternalLink, X } from "lucide-react";
+import { ArrowDownUp, ArrowDown, ArrowUp, ExternalLink, X, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RankedPaper } from "@/types";
@@ -33,6 +33,7 @@ export function RankedPapersTable({
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedPaper, setSelectedPaper] = useState<RankedPaper | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const dynamicParams = useMemo(() => {
     if (papers.length === 0) return null;
@@ -94,6 +95,34 @@ export function RankedPapersTable({
     }
   }
 
+  async function handleCopy() {
+    const columns = ["Rank", "Title", "Year", "Citations", "Relevance", "Final Score", "Source"];
+    const dataRows = sorted.map((p) => [
+      String(p.rank),
+      p.title,
+      p.year != null ? String(p.year) : "n/a",
+      String(p.citationCount),
+      (p.simScore ?? 0).toFixed(3),
+      (p.finalScore ?? 0).toFixed(3),
+      p.source,
+    ]);
+
+    // Compute max width per column for alignment
+    const colWidths = columns.map((col, i) =>
+      Math.max(col.length, ...dataRows.map((row) => row[i].length))
+    );
+
+    const pad = (str: string, width: number) => str.padEnd(width);
+    const formatRow = (cells: string[]) =>
+      "| " + cells.map((c, i) => pad(c, colWidths[i])).join(" | ") + " |";
+    const separator = "| " + colWidths.map((w) => "-".repeat(w)).join(" | ") + " |";
+
+    const lines = [formatRow(columns), separator, ...dataRows.map(formatRow)];
+    await navigator.clipboard.writeText(lines.join("\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   const sorted = useMemo(() => {
     return [...papers].sort((a, b) => {
       const aValue = a[sortKey];
@@ -120,9 +149,23 @@ export function RankedPapersTable({
             <span>Top {topK} highlighted for report generation.</span>
           </div>
         </div>
-        <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
-          Generate Report
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCopy}
+            className="h-10 rounded-lg border-secondary/20 text-secondary hover:border-primary/40 hover:text-primary transition-colors"
+            title="Copy table to clipboard"
+          >
+            {copied ? (
+              <><Check className="size-4 text-green-600" /><span className="text-green-600">Copied!</span></>
+            ) : (
+              <><Copy className="size-4" /><span>Copy Table</span></>
+            )}
+          </Button>
+          <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
+            Generate Report
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-auto max-h-[550px] rounded-lg border border-secondary/10">

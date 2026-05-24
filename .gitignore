@@ -50,9 +50,12 @@ next-env.d.ts
 .gemini/
 .claude/
 .kiro/
+.codex/
+.antigravitycli/
 artifacts/
 scratch/
 CLAUDE.md
+AGENTS.md
 implementation_plan.md
 task.md
 walkthrough.md
