@@ -12,26 +12,37 @@ import { calculateDynamicParams } from "@/lib/pipeline/score";
 import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
 
 /**
- * Uses gemini-2.5-flash-lite to assess whether the user's query is vague and,
+ * Uses gemini-2.0-flash-lite to assess whether the user's query is vague and,
  * if so, rewrites it into a precise, academic-grade search query.
- * Returns the original query if refinement is unnecessary or fails.
+ * Returns the original query if refinement fails.
  */
 async function refineQueryIfNeeded(originalQuery: string): Promise<string> {
-  const prompt = `You are an expert academic research assistant. Your task is to evaluate a user's research query and improve it if it is vague, ambiguous, or too broad.
+  const wordCount = originalQuery.trim().split(/\s+/).length;
 
-Original query: "${originalQuery}"
+  const prompt = `You are an expert academic research librarian. Your job is to transform a user's research topic into a rich, precise academic search query optimised for databases like arXiv and Semantic Scholar.
 
-Instructions:
-1. If the query is already specific, technical, and suitable for academic database searches (arXiv, Semantic Scholar), return it UNCHANGED.
-2. If the query is vague, overly broad, or uses informal language, rewrite it into a precise, academic-grade search query. Add relevant technical terminology, specify the domain, and focus the scope.
-3. Return ONLY the final query string — no explanations, no quotes, no formatting. Just the raw query text.
+User's topic: "${originalQuery}"
 
-Examples of vague → refined:
-- "AI in medicine" → "deep learning applications in medical image segmentation and clinical decision support"
-- "climate stuff" → "climate change impacts on biodiversity and ecosystem resilience"
-- "quantum computers" → "quantum error correction algorithms for fault-tolerant quantum computing"
+Rules:
+1. ALWAYS expand and enrich the query — even if it already sounds technical. Short queries (fewer than 6 words) are ALWAYS too vague and MUST be expanded significantly.
+2. Add specific techniques, methods, algorithms, or sub-domains relevant to the topic.
+3. Include application context or problem framing where it helps narrow the scope.
+4. Use terminology that would appear in academic paper titles and abstracts.
+5. Keep the final query under 20 words.
+6. Return ONLY the refined query — no explanation, no quotes, no bullet points. Just the raw query text.
 
-Now evaluate and return the best query:`;
+Examples:
+- "image encryption" → "chaos-based image encryption algorithms using hyperchaotic maps and pixel scrambling"
+- "AI in medicine" → "deep learning for medical image segmentation and clinical decision support systems"
+- "quantum computers" → "quantum error correction algorithms for fault-tolerant superconducting qubit systems"
+- "climate change" → "climate change impacts on ecosystem resilience and biodiversity loss mechanisms"
+- "drug discovery" → "machine learning approaches for molecular property prediction and de novo drug design"
+- "neural networks" → "deep neural network architectures for image classification and transfer learning"
+- "blockchain security" → "blockchain consensus mechanisms and smart contract vulnerability detection"
+
+Current query word count: ${wordCount} word${wordCount === 1 ? "" : "s"} — ${wordCount < 6 ? "DEFINITELY too short, must be expanded significantly" : "may still need enrichment"}.
+
+Refined academic query:`;
 
   try {
     const result = await executeWithGeminiFallback(
@@ -39,11 +50,13 @@ Now evaluate and return the best query:`;
         const response = await model.generateContent(prompt);
         return response.response.text().trim();
       },
-      "gemini-2.5-flash-lite-preview-06-17"
+      "gemini-2.0-flash-lite"
     );
     // Sanity check: if the model returns something wildly long or empty, fall back
     if (!result || result.length > 300) return originalQuery;
-    return result;
+    // Strip any accidental leading/trailing quotes the model may add
+    const cleaned = result.replace(/^["']|["']$/g, "").trim();
+    return cleaned || originalQuery;
   } catch {
     // Refinement is a best-effort step — never block the pipeline
     return originalQuery;
