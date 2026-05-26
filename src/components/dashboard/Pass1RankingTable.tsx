@@ -74,41 +74,19 @@ export function Pass1RankingTable({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Mirror the scoring breakdown helpers from RankedPapersTable / score.ts
-  const dynamicParams = useMemo(() => {
-    if (papers.length === 0) return null;
+  // Compute recency half-life from the Pass 1 pool (still dynamic).
+  // citPerYearSorted / cohortPercentile removed: Pass 1 now uses
+  // simpleCitationScore (log-normalized cit/yr), not the cohort percentile.
+  const recencyHalfLife = useMemo(() => {
+    if (papers.length === 0) return 5;
     const currentYear = new Date().getFullYear();
-
-    const citPerYearSorted = papers
-      .map((p) => {
-        const age = p.year ? Math.max(1, currentYear - p.year) : 1;
-        return p.citationCount / age;
-      })
-      .sort((a, b) => a - b);
-
     const years = papers
       .map((p) => p.year)
       .filter((y): y is number => typeof y === "number" && y > 0);
-    let recencyWindow = 12;
-    if (years.length > 0) {
-      const minYear = Math.min(...years);
-      recencyWindow = Math.max(3, Math.min(25, currentYear - minYear));
-    }
-    const recencyHalfLife = Math.max(2, Math.min(12, recencyWindow / 2));
-
-    function cohortPercentile(citationCount: number, year: number | null): number {
-      if (citPerYearSorted.length === 0) return 0;
-      const age = year ? Math.max(1, currentYear - year) : 1;
-      const citPerYear = citationCount / age;
-      let rank = 0;
-      for (const v of citPerYearSorted) {
-        if (v < citPerYear) rank++;
-        else break;
-      }
-      return rank / citPerYearSorted.length;
-    }
-
-    return { recencyHalfLife, cohortPercentile };
+    if (years.length === 0) return 5;
+    const minYear     = Math.min(...years);
+    const window      = Math.max(3, Math.min(25, currentYear - minYear));
+    return Math.max(2, Math.min(12, window / 2));
   }, [papers]);
 
   const cutoffRank = useMemo(
@@ -413,23 +391,14 @@ export function Pass1RankingTable({
                 <div>Citation Score:</div>
                 <div className="font-semibold text-on-surface text-right">
                   {(selectedPaper.citationScore ?? 0).toFixed(3)}{" "}
-                  <span className="text-xs font-normal text-secondary/65">
-                    (
-                    {Math.round(
-                      (dynamicParams?.cohortPercentile(
-                        selectedPaper.citationCount,
-                        selectedPaper.year ?? null
-                      ) ?? 0) * 100
-                    )}
-                    th pct of pool)
-                  </span>
+                  <span className="text-xs font-normal text-secondary/65">(log-normalized cit/yr)</span>
                 </div>
 
                 <div>Recency Score:</div>
                 <div className="font-semibold text-on-surface text-right">
                   {(selectedPaper.recencyScore ?? 0).toFixed(3)}{" "}
                   <span className="text-xs font-normal text-secondary/65">
-                    (half-life: {dynamicParams?.recencyHalfLife ?? 5} yrs)
+                    (half-life: {recencyHalfLife} yrs)
                   </span>
                 </div>
 
