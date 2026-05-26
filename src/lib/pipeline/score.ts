@@ -90,6 +90,33 @@ export function citationScore(
   return rank / citPerYearSorted.length;
 }
 
+// ─── Pass 1 only: simple log-normalised citation score ────────────────────────
+/**
+ * A self-contained citation signal for Pass 1 filtering.
+ *
+ * Pass 1's only goal is to select the top-N candidates to hand to Pass 2.
+ * Percentile-ranking (citationScore) is unnecessary there because:
+ *  - It requires the full cohort array, which is discarded after filtering.
+ *  - The cohort changes in Pass 2 anyway, so Pass 1 percentiles don't predict
+ *    Pass 2 percentiles reliably.
+ *  - The filtering decision just needs directional accuracy, not cohort precision.
+ *
+ * This function maps citations-per-year onto [0, 1] via log1p, with a soft
+ * ceiling at MAX_CIT_PER_YEAR.  Papers with 0 citations score 0; anything at
+ * or above the ceiling saturates at 1.  No cohort array needed.
+ */
+const PASS1_MAX_CIT_PER_YEAR = 1000;
+
+export function simpleCitationScore(
+  citationCount: number,
+  year: number | null
+): number {
+  const currentYear = new Date().getFullYear();
+  const age        = year ? Math.max(1, currentYear - year) : 1;
+  const citPerYear = citationCount / age;
+  return Math.min(1, Math.log1p(citPerYear) / Math.log1p(PASS1_MAX_CIT_PER_YEAR));
+}
+
 // ─── Idea 5: Exponential recency decay ───────────────────────────────────────
 /**
  * Computes an exponential decay score using a dynamic half-life.

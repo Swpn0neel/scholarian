@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
-import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
+import { rankPapers, rankPapersPass1, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { fetchArxivPapers } from "@/lib/pipeline/fetchers/arxiv";
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
             step: "scoring",
             message: `Pass 1 — scoring all ${deduped.length} candidates (recency window: ${rw1} yrs · half-life: ${rhl1} yrs)...`,
           });
-          const internalRanked = await rankPapers(deduped, settings, queryEmbedding);
+          const internalRanked = await rankPapersPass1(deduped, settings, queryEmbedding);
 
           // Quality filter — drop the bottom 40%, but never let the pool fall
           // below maxPapers.  internalRanked is already sorted best → worst by
