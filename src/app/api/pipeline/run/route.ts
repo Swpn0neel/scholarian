@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
-import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
+import { rankPapers, rankPapersPass1, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { fetchArxivPapers } from "@/lib/pipeline/fetchers/arxiv";
@@ -149,7 +149,10 @@ export async function POST(request: Request) {
             step: "scoring",
             message: `Pass 1 — scoring all ${deduped.length} candidates (recency window: ${rw1} yrs · half-life: ${rhl1} yrs)...`,
           });
-          const internalRanked = await rankPapers(deduped, settings, queryEmbedding);
+          // Pass 1 — score the full pool with a simple (non-percentile) citation
+          // signal.  Goal: select the best ≤ maxPapers candidates for Pass 2.
+          // No cohort-percentile needed here — directional accuracy is enough.
+          const internalRanked = await rankPapersPass1(deduped, settings, queryEmbedding);
 
           // ── Transparent: send Pass 1 intermediate results to the client ────
           // These are ephemeral — NOT saved to the database. The client will
