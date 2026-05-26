@@ -51,12 +51,12 @@ function SortIcon({
  */
 export function Pass1RankingTable({
   papers,
-  qualityThresholdPct = 40,
+  maxPapers,
   isComplete = false,
 }: {
   papers: RankedPaper[];
-  /** Percentage of bottom papers that will be dropped by the quality filter */
-  qualityThresholdPct?: number;
+  /** The maxPapers cap — papers with rank ≤ maxPapers are passed to Pass 2 */
+  maxPapers: number;
   /** True once Pass 2 is done — switches header/banner/footer to completed state */
   isComplete?: boolean;
 }) {
@@ -89,10 +89,9 @@ export function Pass1RankingTable({
     return Math.max(2, Math.min(12, window / 2));
   }, [papers]);
 
-  const cutoffRank = useMemo(
-    () => Math.ceil(papers.length * (1 - qualityThresholdPct / 100)),
-    [papers.length, qualityThresholdPct]
-  );
+  // cutoffRank is simply maxPapers: papers ranked 1–maxPapers go to Pass 2,
+  // everything beyond is dropped from the candidate pool.
+  const cutoffRank = maxPapers;
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -159,14 +158,13 @@ export function Pass1RankingTable({
               <Info className="size-3 shrink-0" />
               {isComplete ? (
                 <span>
-                  Quality filter removed bottom{" "}
-                  <strong className="text-secondary">{qualityThresholdPct}%</strong>. Scroll down
-                  for the Pass 2 final ranking.
+                  Top <strong className="text-secondary">{maxPapers}</strong> papers passed to Pass 2. Scroll down
+                  for the final ranking.
                 </span>
               ) : (
                 <span>
-                  Bottom <strong className="text-secondary">{qualityThresholdPct}%</strong> will be
-                  filtered before Pass 2 re-ranking
+                  Top <strong className="text-secondary">{maxPapers}</strong> of{" "}
+                  {papers.length} candidates will be passed to Pass 2
                 </span>
               )}
             </div>
@@ -191,23 +189,20 @@ export function Pass1RankingTable({
             className={`flex items-center gap-2 px-5 py-2 border-b text-[11px] ${
               isComplete
                 ? "bg-tertiary-fixed-dim/10 border-tertiary-fixed-dim/20 text-tertiary"
-                : "bg-amber-50/60 border-amber-100 text-amber-700"
+                : "bg-primary/5 border-primary/10 text-primary/80"
             }`}
           >
             <Filter className="size-3 shrink-0" />
             {isComplete ? (
               <span>
-                Pass 1 scored all <strong>{papers.length}</strong> candidates. Quality filter kept{" "}
-                <strong>{cutoffRank}</strong> survivors (dropped{" "}
-                <strong>{papers.length - cutoffRank}</strong>), then Pass 2 re-ranked the final
-                cohort. Click any row to inspect its scores. Compare with the final ranking below.
+                Pass 1 ranked all <strong>{papers.length}</strong> candidates. Top{" "}
+                <strong>{cutoffRank}</strong> were passed to Pass 2 ({papers.length - cutoffRank} dropped).
+                Compare the rankings below.
               </span>
             ) : (
               <span>
-                These are <strong>preliminary scores</strong> — the quality filter will remove the
-                bottom {qualityThresholdPct}% (ranks {cutoffRank + 1}–{papers.length}), then Pass 2
-                will re-rank the survivors with cohort-adjusted metrics.{" "}
-                <strong>Click any row to inspect details.</strong>
+                Pass 1 is ranking all <strong>{papers.length}</strong> candidates. Top{" "}
+                <strong>{maxPapers}</strong> will be passed to Pass 2.
               </span>
             )}
           </div>
@@ -309,9 +304,8 @@ export function Pass1RankingTable({
         {isOpen && (
           <div className="flex items-center justify-between border-t border-secondary/8 px-5 py-2.5 bg-surface/40 text-[11px] text-secondary">
             <span>
-              <strong className="text-emerald-700">{cutoffRank}</strong> papers survived the quality
-              filter ·{" "}
-              <strong className="text-red-500">{papers.length - cutoffRank}</strong> were dropped
+              <strong className="text-primary">{cutoffRank}</strong> papers passed to Pass 2 ·{" "}
+              <strong className="text-secondary/70">{papers.length - cutoffRank}</strong> dropped
             </span>
             {isComplete ? (
               <span className="text-tertiary font-semibold">↓ Final Pass 2 ranking is shown below</span>
@@ -342,11 +336,11 @@ export function Pass1RankingTable({
                 {/* Fate badge in drawer */}
                 {selectedPaper.rank <= cutoffRank ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">
-                    ✓ Survived filter
+                    ✓ Passed to Pass 2
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-500">
-                    ✗ Filtered out
+                    ✗ Dropped by cap
                   </span>
                 )}
               </div>
@@ -361,10 +355,11 @@ export function Pass1RankingTable({
 
             {/* Pass 1 context note */}
             <div className="mb-5 rounded-lg bg-primary/5 border border-primary/10 px-3.5 py-2.5 text-[11px] text-primary/80">
-              <strong>Pass 1 score</strong> — scored against the full{" "}
-              {papers.length}-paper candidate pool before the quality filter.{" "}
+              <strong>Pass 1 score</strong> — ranked against the full {papers.length}-paper candidate pool.
+              Top {maxPapers} are passed to Pass 2;{" "}
+              {papers.length - maxPapers} are dropped.{" "}
               {isComplete
-                ? "Pass 2 re-ranked the surviving cohort with tighter metrics."
+                ? "Pass 2 re-ranked the top cohort with tighter, cohort-accurate metrics."
                 : "Pass 2 re-ranking is in progress."}
             </div>
 

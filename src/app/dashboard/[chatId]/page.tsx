@@ -281,7 +281,7 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
             {pipeline.pass1Papers.length > 0 && (
               <Pass1RankingTable
                 papers={pipeline.pass1Papers}
-                qualityThresholdPct={40}
+                maxPapers={pipeline.settings.maxPapers}
                 isComplete={pipeline.step !== "scoring"}
               />
             )}

@@ -141,54 +141,33 @@ export async function POST(request: Request) {
           cappedCandidates = deduped;
           ranked = await rankPapers(deduped, settings, queryEmbedding);
         } else {
-          // ── Two-pass: pool exceeds maxPapers, filter then re-rank ───────────
+          // ── Two-pass: pool exceeds maxPapers ────────────────────────────────
+          // Pass 1 — rank the full pool, then hand the top maxPapers to Pass 2.
+          // No quality filter — we simply take the best candidates by score.
 
-          // Pass 1 — score the full pool
           const { recencyWindow: rw1, recencyHalfLife: rhl1 } = calculateDynamicParams(deduped);
           send(controller, "step", {
             step: "scoring",
             message: `Pass 1 — scoring all ${deduped.length} candidates (recency window: ${rw1} yrs · half-life: ${rhl1} yrs)...`,
           });
-          // Pass 1 — score the full pool with a simple (non-percentile) citation
-          // signal.  Goal: select the best ≤ maxPapers candidates for Pass 2.
-          // No cohort-percentile needed here — directional accuracy is enough.
           const internalRanked = await rankPapersPass1(deduped, settings, queryEmbedding);
 
           // ── Transparent: send Pass 1 intermediate results to the client ────
-          // These are ephemeral — NOT saved to the database. The client will
-          // display them only during the scoring phase.
+          // These are ephemeral — NOT saved to the database.
           send(controller, "pass1_papers", internalRanked);
 
-          // Quality filter — drop the bottom 40%, but never let the pool fall
-          // below maxPapers.  internalRanked is already sorted best → worst by
-          // Pass 1, so slicing the top-N is equivalent to the score threshold
-          // while honouring the floor guarantee.
-          const targetDropCount = Math.floor(internalRanked.length * 0.4);
-          const keepCount       = Math.max(settings.maxPapers, internalRanked.length - targetDropCount);
-          const qualityFiltered = internalRanked.slice(0, keepCount);
-          const droppedCount    = internalRanked.length - qualityFiltered.length;
-
-          const filterMsg = droppedCount > 0
-            ? `Quality filter removed ${droppedCount} low-scoring papers. ${qualityFiltered.length} candidates remain.`
-            : `Quality filter: pool (${internalRanked.length}) too close to limit — keeping all to preserve ${settings.maxPapers}-paper target.`;
-
-          send(controller, "step", {
-            step: "scoring",
-            message: filterMsg,
-          });
-
-          // Cap to maxPapers and strip RankedPaper → RawPaper so the final
-          // re-rank pass gets a clean, uniform input (no stale scores bleeding in).
-          cappedCandidates = qualityFiltered
+          // Take the top maxPapers and strip RankedPaper → RawPaper so Pass 2
+          // gets a clean input (no stale scores bleeding in).
+          cappedCandidates = internalRanked
             .slice(0, settings.maxPapers)
             .map(({ simScore: _s, citationScore: _c, recencyScore: _r, finalScore: _f, rank: _rk, embedding: _e, ...raw }) => raw);
 
           send(controller, "step", {
             step: "scoring",
-            message: `Showing top ${cappedCandidates.length} papers (capped at ${settings.maxPapers}). Re-ranking final cohort...`,
+            message: `Pass 1 selected top ${cappedCandidates.length} of ${deduped.length} candidates. Re-ranking for Pass 2...`,
           });
 
-          // Pass 2 — re-rank the final cohort so cohort-relative scores are tight
+          // Pass 2 — re-rank the capped cohort so cohort-relative scores are tight
           const params = calculateDynamicParams(cappedCandidates);
           recencyWindow   = params.recencyWindow;
           recencyHalfLife = params.recencyHalfLife;
@@ -235,7 +214,7 @@ export async function POST(request: Request) {
         // has a chance to call /api/pipeline/metadata.
         const scoringEventMsg = deduped.length <= settings.maxPapers
           ? `Pool (${ranked.length} papers) fit within ${settings.maxPapers}-paper limit — ranked directly.`
-          : `Pass 1 scored ${deduped.length} candidates; quality filter kept ${cappedCandidates.length}. Pass 2 re-ranked final cohort (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs).`;
+          : `Pass 1 ranked ${deduped.length} candidates; top ${cappedCandidates.length} passed to Pass 2 (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs).`;
 
         const pipelineEvents = [
           { step: "fetching",      message: `Sources returned: arXiv ${arxivPapers.length}, Semantic Scholar ${semanticPapers.length}, Google Scholar ${serpPapers.length}${failedSources.length ? ` · ⚠ ${failedSources.join(", ")} unavailable` : ""}.`, ts: Date.now() - 6000 },
