@@ -42,6 +42,12 @@ interface ResearchStore {
   step: PipelineStep;
   events: PipelineEvent[];
   papers: RankedPaper[];
+  /**
+   * Pass 1 intermediate results — ephemeral, never saved to DB.
+   * Only populated during the two-pass ranking flow (when pool > maxPapers).
+   * Cleared when Pass 2 results arrive or when the run is reset.
+   */
+  pass1Papers: RankedPaper[];
   report: Report | null;
   reportMarkdown: string;
   currentRunId: string | null;
@@ -58,6 +64,8 @@ interface ResearchStore {
   setStep: (step: PipelineStep, message?: string) => void;
   addEvent: (step: PipelineStep, message: string) => void;
   setPapers: (papers: RankedPaper[]) => void;
+  /** Set ephemeral Pass 1 intermediate results (transparent mode) */
+  setPass1Papers: (papers: RankedPaper[]) => void;
   appendReportMarkdown: (chunk: string) => void;
   setReport: (report: Report | null) => void;
   setCurrentRunId: (runId: string | null) => void;
@@ -82,6 +90,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
   step: "idle",
   events: [],
   papers: [],
+  pass1Papers: [],
   report: null,
   reportMarkdown: "",
   currentRunId: null,
@@ -110,7 +119,9 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       events: [...state.events, { step, message, ts: Date.now() }],
     })),
 
-  setPapers: (papers) => set({ papers, step: "ranked", isRunning: false }),
+  setPapers: (papers) => set({ papers, step: "ranked", isRunning: false, pass1Papers: [] }),
+
+  setPass1Papers: (papers) => set({ pass1Papers: papers }),
 
   appendReportMarkdown: (chunk) =>
     set((state) => ({ reportMarkdown: `${state.reportMarkdown}${chunk}` })),
@@ -152,6 +163,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
         step: "idle",
         events: [],
         papers: [],
+        pass1Papers: [],
         report: null,
         reportMarkdown: "",
         currentRunId: null,
@@ -162,6 +174,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
         step: "idle",
         events: [],
         papers: [],
+        pass1Papers: [],
         report: null,
         reportMarkdown: "",
         currentRunId: null,
@@ -210,6 +223,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       step: "idle",
       events: [],
       papers: [],
+      pass1Papers: [],
       report: null,
       reportMarkdown: "",
       currentRunId: null,
