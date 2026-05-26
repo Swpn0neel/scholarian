@@ -40,10 +40,5 @@
     "eslint-config-next": "15.1.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2"
-  },
-  "pnpm": {
-    "overrides": {
-      "pako": "1.0.11"
-    }
   }
 }
