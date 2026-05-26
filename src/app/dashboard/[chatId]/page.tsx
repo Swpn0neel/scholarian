@@ -276,11 +276,14 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
             />
 
             {/* ── Transparent: Pass 1 intermediate ranking table ── */}
-            {/* Shown only during the scoring phase when two-pass ranking is active.
-                Disappears automatically when Pass 2 completes (pass1Papers is cleared
-                by setPapers). Data is ephemeral — never saved to the database. */}
-            {pipeline.pass1Papers.length > 0 && pipeline.step === "scoring" && (
-              <Pass1RankingTable papers={pipeline.pass1Papers} qualityThresholdPct={40} />
+            {/* Persists alongside the final table so the user can compare Pass 1
+                vs Pass 2 rankings. Cleared only when a new run starts. */}
+            {pipeline.pass1Papers.length > 0 && (
+              <Pass1RankingTable
+                papers={pipeline.pass1Papers}
+                qualityThresholdPct={40}
+                isComplete={pipeline.step !== "scoring"}
+              />
             )}
 
             <RankedPapersTable

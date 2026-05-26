@@ -119,7 +119,7 @@ export const useResearchStore = create<ResearchStore>((set, get) => ({
       events: [...state.events, { step, message, ts: Date.now() }],
     })),
 
-  setPapers: (papers) => set({ papers, step: "ranked", isRunning: false, pass1Papers: [] }),
+  setPapers: (papers) => set({ papers, step: "ranked", isRunning: false }),
 
   setPass1Papers: (papers) => set({ pass1Papers: papers }),
 

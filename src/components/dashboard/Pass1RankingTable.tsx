@@ -46,10 +46,13 @@ function SortIcon({
 export function Pass1RankingTable({
   papers,
   qualityThresholdPct = 40,
+  isComplete = false,
 }: {
   papers: RankedPaper[];
   /** Percentage of bottom papers that will be dropped by the quality filter */
   qualityThresholdPct?: number;
+  /** True once Pass 2 is done — changes footer wording */
+  isComplete?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("rank");
@@ -90,10 +93,16 @@ export function Pass1RankingTable({
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-5 py-3.5 bg-primary/5 border-b border-primary/15">
         <div className="flex items-center gap-2.5">
-          {/* Animated indicator — live during scoring */}
+          {/* Animated indicator while live; static check once complete */}
           <span className="relative flex size-2.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-50" />
-            <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
+            {!isComplete && (
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-50" />
+            )}
+            <span
+              className={`relative inline-flex size-2.5 rounded-full ${
+                isComplete ? "bg-tertiary-fixed-dim" : "bg-primary"
+              }`}
+            />
           </span>
 
           <div className="flex items-center gap-2">
@@ -101,8 +110,14 @@ export function Pass1RankingTable({
             <h2 className="font-heading text-sm font-semibold text-on-surface">
               Pass 1 Ranking
             </h2>
-            <Badge className="rounded-full bg-primary/10 text-primary border-0 text-[9px] font-bold uppercase tracking-widest px-2">
-              Intermediate · {papers.length} candidates
+            <Badge
+              className={`rounded-full border-0 text-[9px] font-bold uppercase tracking-widest px-2 ${
+                isComplete
+                  ? "bg-tertiary-fixed-dim/20 text-tertiary"
+                  : "bg-primary/10 text-primary"
+              }`}
+            >
+              {isComplete ? "Pass 1 Complete" : "Intermediate"} · {papers.length} candidates
             </Badge>
           </div>
         </div>
@@ -111,10 +126,18 @@ export function Pass1RankingTable({
           {/* Info tooltip text */}
           <div className="hidden md:flex items-center gap-1.5 text-[11px] text-secondary/70">
             <Info className="size-3 shrink-0" />
-            <span>
-              Bottom <strong className="text-secondary">{qualityThresholdPct}%</strong> will be
-              filtered before Pass 2 re-ranking
-            </span>
+            {isComplete ? (
+              <span>
+                Quality filter removed bottom{" "}
+                <strong className="text-secondary">{qualityThresholdPct}%</strong>. Scroll down
+                for the Pass 2 final ranking.
+              </span>
+            ) : (
+              <span>
+                Bottom <strong className="text-secondary">{qualityThresholdPct}%</strong> will be
+                filtered before Pass 2 re-ranking
+              </span>
+            )}
           </div>
 
           <button
@@ -137,13 +160,28 @@ export function Pass1RankingTable({
 
       {/* ── Ephemeral notice banner ── */}
       {isOpen && (
-        <div className="flex items-center gap-2 px-5 py-2 bg-amber-50/60 border-b border-amber-100 text-[11px] text-amber-700">
-          <Filter className="size-3 shrink-0 text-amber-500" />
-          <span>
-            These are <strong>preliminary scores</strong> — the quality filter will remove the
-            bottom {qualityThresholdPct}% (ranks {cutoffRank + 1}–{papers.length}), then Pass 2
-            will re-rank the survivors with cohort-adjusted metrics.
-          </span>
+        <div
+          className={`flex items-center gap-2 px-5 py-2 border-b text-[11px] ${
+            isComplete
+              ? "bg-tertiary-fixed-dim/10 border-tertiary-fixed-dim/20 text-tertiary"
+              : "bg-amber-50/60 border-amber-100 text-amber-700"
+          }`}
+        >
+          <Filter className="size-3 shrink-0" />
+          {isComplete ? (
+            <span>
+              Pass 1 scored all <strong>{papers.length}</strong> candidates. Quality filter kept{" "}
+              <strong>{cutoffRank}</strong> survivors (dropped{" "}
+              <strong>{papers.length - cutoffRank}</strong>), then Pass 2 re-ranked the final
+              cohort. Compare the rankings below.
+            </span>
+          ) : (
+            <span>
+              These are <strong>preliminary scores</strong> — the quality filter will remove the
+              bottom {qualityThresholdPct}% (ranks {cutoffRank + 1}–{papers.length}), then Pass 2
+              will re-rank the survivors with cohort-adjusted metrics.
+            </span>
+          )}
         </div>
       )}
 
@@ -243,13 +281,17 @@ export function Pass1RankingTable({
       {isOpen && (
         <div className="flex items-center justify-between border-t border-secondary/8 px-5 py-2.5 bg-surface/40 text-[11px] text-secondary">
           <span>
-            <strong className="text-emerald-700">{cutoffRank}</strong> papers will survive the
-            quality filter →{" "}
-            <strong className="text-red-500">{papers.length - cutoffRank}</strong> will be dropped
+            <strong className="text-emerald-700">{cutoffRank}</strong> papers survived the quality
+            filter ·{" "}
+            <strong className="text-red-500">{papers.length - cutoffRank}</strong> were dropped
           </span>
-          <span className="text-secondary/50 italic">
-            Waiting for Pass 2 re-ranking…
-          </span>
+          {isComplete ? (
+            <span className="flex items-center gap-1 text-tertiary font-semibold">
+              ↓ Final Pass 2 ranking is shown below
+            </span>
+          ) : (
+            <span className="text-secondary/50 italic">Waiting for Pass 2 re-ranking…</span>
+          )}
         </div>
       )}
     </section>
