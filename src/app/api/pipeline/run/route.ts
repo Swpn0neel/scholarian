@@ -154,7 +154,9 @@ export async function POST(request: Request) {
 
           // ── Transparent: send Pass 1 intermediate results to the client ────
           // These are ephemeral — NOT saved to the database.
-          send(controller, "pass1_papers", internalRanked);
+          // Strip embeddings to prevent blowing up the Vercel SSE payload limit.
+          const pass1Payload = internalRanked.map(({ embedding: _e, ...paper }) => paper);
+          send(controller, "pass1_papers", pass1Payload);
 
           // Take the top maxPapers and strip RankedPaper → RawPaper so Pass 2
           // gets a clean input (no stale scores bleeding in).
@@ -243,7 +245,8 @@ export async function POST(request: Request) {
           console.error("Failed to save run metadata to database:", metaError);
         }
 
-        send(controller, "papers", ranked);
+        const papersPayload = ranked.map(({ embedding: _e, ...paper }) => paper);
+        send(controller, "papers", papersPayload);
         send(controller, "done", { runId, chatId });
       } catch (error) {
         send(controller, "error", { message: error instanceof Error ? error.message : "Pipeline failed" });
