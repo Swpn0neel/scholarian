@@ -46,42 +46,59 @@ export async function POST(request: Request) {
 
         send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${query}"...` });
         
-        const perSource = Math.ceil(settings.maxPapers / 3);
+        // Ask every source for the full maxPapers quota so that if one source
+        // under-delivers (or fails), the others can compensate. Each fetcher
+        // already clamps to its own API ceiling (SerpAPI → 20, Semantic Scholar
+        // → 100), so we won't over-fetch beyond those hard limits.
         const [arxiv, semantic, serp] = await Promise.allSettled([
-          fetchArxivPapers(query, perSource),
-          fetchSemanticScholarPapers(query, perSource),
-          fetchSerpApiPapers(query, perSource),
+          fetchArxivPapers(query, settings.maxPapers),
+          fetchSemanticScholarPapers(query, settings.maxPapers),
+          fetchSerpApiPapers(query, settings.maxPapers),
         ]);
       
         const arxivPapers = arxiv.status === "fulfilled" ? arxiv.value : [];
         const semanticPapers = semantic.status === "fulfilled" ? semantic.value : [];
         const serpPapers = serp.status === "fulfilled" ? serp.value : [];
-      
-        const raw: RawPaper[] = [...arxivPapers, ...semanticPapers, ...serpPapers];
+
+        // Log per-source counts and surface any sources that failed/contributed nothing
+        const failedSources: string[] = [];
+        if (arxiv.status === "rejected") failedSources.push("arXiv");
+        if (semantic.status === "rejected") failedSources.push("Semantic Scholar");
+        if (serp.status === "rejected") failedSources.push("Google Scholar");
+
+        send(controller, "step", {
+          step: "fetching",
+          message: `Sources returned: arXiv ${arxivPapers.length}, Semantic Scholar ${semanticPapers.length}, Google Scholar ${serpPapers.length}${failedSources.length ? ` · ⚠ ${failedSources.join(", ")} unavailable` : ""}.`,
+        });
+
+        // Merge all source results into one pool (no round-robin cap yet —
+        // we rank all candidates first and let quality decide the final set).
+        const allPapers: RawPaper[] = [...arxivPapers, ...semanticPapers, ...serpPapers];
+
+        send(controller, "step", {
+          step: "fetching",
+          message: `Combined ${allPapers.length} candidates from all sources. Beginning quality filtering...`,
+        });
 
         // Filter out papers already seen in the previous run so fresh results
         // get ranked higher in refinement cycles.
         const filtered = excludedSet.size > 0
-          ? raw.filter((p) => !excludedSet.has(p.title.toLowerCase().trim()))
-          : raw;
+          ? allPapers.filter((p) => !excludedSet.has(p.title.toLowerCase().trim()))
+          : allPapers;
 
         if (excludedSet.size > 0) {
           send(controller, "step", {
             step: "fetching",
-            message: `Excluded ${raw.length - filtered.length} previously-seen papers. ${filtered.length} new candidates remaining.`,
+            message: `Excluded ${allPapers.length - filtered.length} previously-seen papers. ${filtered.length} new candidates remaining.`,
           });
         }
-        
-        send(controller, "step", { 
-          step: "fetching", 
-          message: `Found ${arxivPapers.length} arXiv, ${semanticPapers.length} Semantic Scholar, and ${serpPapers.length} Google Scholar papers.` 
-        });
 
-        // Deduplicate once — result used for both the log message and downstream
+        // Deduplicate the full pool — no cap yet; we want every candidate
+        // available for the internal quality-filter pass.
         const deduped = deduplicatePapers(filtered);
         send(controller, "step", {
           step: "deduplicating",
-          message: `${raw.length} papers → ${deduped.length} unique after deduplication`,
+          message: `${filtered.length} papers → ${deduped.length} unique after deduplication.`,
         });
 
         send(controller, "step", { step: "embedding", message: "Generating 768-dimensional semantic embeddings..." });
@@ -92,12 +109,87 @@ export async function POST(request: Request) {
 
         send(controller, "step", { step: "embedding", message: "Embeddings complete. Comparing vector distances..." });
 
-        const { recencyWindow, recencyHalfLife } = calculateDynamicParams(deduped);
-        send(controller, "step", {
-          step: "scoring",
-          message: `Applying hybrid ranking (percentile-rank citations · recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`,
-        });
-        const ranked = await rankPapers(deduped, settings, queryEmbedding);
+        // ── Ranking strategy ──────────────────────────────────────────────────
+        // If the deduplicated pool already fits within maxPapers, there is
+        // nothing to trim — rank everything in a single pass and show it all.
+        //
+        // Only when the pool EXCEEDS maxPapers do we run a two-pass approach:
+        //   Pass 1 — score the full pool (cohort-relative stats are accurate
+        //             because every candidate participates).
+        //   Quality filter — drop the bottom 40% of the score distribution so
+        //             genuinely weak papers (low relevance + low citations +
+        //             very old) never reach the user.
+        //   Cap — take the top-N survivors.
+        //   Pass 2 — re-rank the final cohort so cohort-relative metrics
+        //             (percentile citations, dynamic recency half-life) reflect
+        //             the *final* set rather than the larger candidate pool.
+
+        let ranked: Awaited<ReturnType<typeof rankPapers>>;
+        let recencyWindow: number;
+        let recencyHalfLife: number;
+        let cappedCandidates: RawPaper[];
+
+        if (deduped.length <= settings.maxPapers) {
+          // ── Single-pass: pool already fits, rank everything ─────────────────
+          send(controller, "step", {
+            step: "scoring",
+            message: `Pool (${deduped.length} papers) fits within the ${settings.maxPapers}-paper limit — ranking all candidates directly.`,
+          });
+          const params = calculateDynamicParams(deduped);
+          recencyWindow    = params.recencyWindow;
+          recencyHalfLife  = params.recencyHalfLife;
+          cappedCandidates = deduped;
+          ranked = await rankPapers(deduped, settings, queryEmbedding);
+        } else {
+          // ── Two-pass: pool exceeds maxPapers, filter then re-rank ───────────
+
+          // Pass 1 — score the full pool
+          const { recencyWindow: rw1, recencyHalfLife: rhl1 } = calculateDynamicParams(deduped);
+          send(controller, "step", {
+            step: "scoring",
+            message: `Pass 1 — scoring all ${deduped.length} candidates (recency window: ${rw1} yrs · half-life: ${rhl1} yrs)...`,
+          });
+          const internalRanked = await rankPapers(deduped, settings, queryEmbedding);
+
+          // Quality filter — drop the bottom 40%, but never let the pool fall
+          // below maxPapers.  internalRanked is already sorted best → worst by
+          // Pass 1, so slicing the top-N is equivalent to the score threshold
+          // while honouring the floor guarantee.
+          const targetDropCount = Math.floor(internalRanked.length * 0.4);
+          const keepCount       = Math.max(settings.maxPapers, internalRanked.length - targetDropCount);
+          const qualityFiltered = internalRanked.slice(0, keepCount);
+          const droppedCount    = internalRanked.length - qualityFiltered.length;
+
+          const filterMsg = droppedCount > 0
+            ? `Quality filter removed ${droppedCount} low-scoring papers. ${qualityFiltered.length} candidates remain.`
+            : `Quality filter: pool (${internalRanked.length}) too close to limit — keeping all to preserve ${settings.maxPapers}-paper target.`;
+
+          send(controller, "step", {
+            step: "scoring",
+            message: filterMsg,
+          });
+
+          // Cap to maxPapers and strip RankedPaper → RawPaper so the final
+          // re-rank pass gets a clean, uniform input (no stale scores bleeding in).
+          cappedCandidates = qualityFiltered
+            .slice(0, settings.maxPapers)
+            .map(({ simScore: _s, citationScore: _c, recencyScore: _r, finalScore: _f, rank: _rk, embedding: _e, ...raw }) => raw);
+
+          send(controller, "step", {
+            step: "scoring",
+            message: `Showing top ${cappedCandidates.length} papers (capped at ${settings.maxPapers}). Re-ranking final cohort...`,
+          });
+
+          // Pass 2 — re-rank the final cohort so cohort-relative scores are tight
+          const params = calculateDynamicParams(cappedCandidates);
+          recencyWindow   = params.recencyWindow;
+          recencyHalfLife = params.recencyHalfLife;
+          send(controller, "step", {
+            step: "scoring",
+            message: `Pass 2 — final ranking (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`,
+          });
+          ranked = await rankPapers(cappedCandidates, settings, queryEmbedding);
+        }
         
         const runId = crypto.randomUUID();
         
@@ -133,12 +225,17 @@ export async function POST(request: Request) {
         // Persist run metadata (settings + events) immediately on the server so the
         // run is fully recoverable even if the user navigates away before the client
         // has a chance to call /api/pipeline/metadata.
+        const scoringEventMsg = deduped.length <= settings.maxPapers
+          ? `Pool (${ranked.length} papers) fit within ${settings.maxPapers}-paper limit — ranked directly.`
+          : `Pass 1 scored ${deduped.length} candidates; quality filter kept ${cappedCandidates.length}. Pass 2 re-ranked final cohort (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs).`;
+
         const pipelineEvents = [
-          { step: "fetching",      message: `Found ${arxivPapers.length} arXiv, ${semanticPapers.length} Semantic Scholar, and ${serpPapers.length} Google Scholar papers.`, ts: Date.now() - 5000 },
-          { step: "deduplicating", message: `${raw.length} papers → ${deduped.length} unique after deduplication`, ts: Date.now() - 4000 },
-          { step: "embedding",     message: "Embeddings complete. Comparing vector distances...",               ts: Date.now() - 3000 },
-          { step: "scoring",       message: `Applying hybrid ranking (percentile-rank citations · recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`, ts: Date.now() - 2000 },
-          { step: "ranked",        message: `Ranked ${ranked.length} papers by composite score.`,              ts: Date.now() - 1000 },
+          { step: "fetching",      message: `Sources returned: arXiv ${arxivPapers.length}, Semantic Scholar ${semanticPapers.length}, Google Scholar ${serpPapers.length}${failedSources.length ? ` · ⚠ ${failedSources.join(", ")} unavailable` : ""}.`, ts: Date.now() - 6000 },
+          { step: "fetching",      message: `Combined ${allPapers.length} candidates from all sources.`,                                                                                 ts: Date.now() - 5000 },
+          { step: "deduplicating", message: `${filtered.length} papers → ${deduped.length} unique after deduplication.`,                                                                ts: Date.now() - 4000 },
+          { step: "embedding",     message: "Embeddings complete. Comparing vector distances...",                                                                                         ts: Date.now() - 3000 },
+          { step: "scoring",       message: scoringEventMsg,                                                                                                                             ts: Date.now() - 2000 },
+          { step: "ranked",        message: `Ranked ${ranked.length} papers by composite score.`,                                                                                        ts: Date.now() - 1000 },
         ];
 
         const { error: metaError } = await supabase.from("run_metadata").upsert(

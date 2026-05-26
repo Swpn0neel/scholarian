@@ -246,7 +246,7 @@ export function RankedPapersTable({
             <p className="mt-3 text-sm text-secondary">{selectedPaper.authors.join(", ") || "Unknown authors"}</p>
             <p className="mt-6 text-sm leading-7 text-on-surface">{selectedPaper.abstract ?? "No abstract available."}</p>
             <div className="mt-6 space-y-3 rounded-lg bg-surface-container-low p-4 border border-secondary/5 text-sm text-secondary">
-              <div className="font-heading text-xs uppercase tracking-[0.1em] text-secondary/70 font-bold">Scoring Breakdown</div>
+              <div className="font-heading text-xs uppercase tracking-widest text-secondary/70 font-bold">Scoring Breakdown</div>
               <div className="grid grid-cols-2 gap-y-2.5 mt-2">
                 <div>Relevance Score:</div>
                 <div className="font-semibold text-on-surface text-right">

@@ -21,11 +21,20 @@ export async function fetchArxivPapers(query: string, maxResults: number): Promi
   url.searchParams.set("search_query", `all:${query}`);
   url.searchParams.set("max_results", String(maxResults));
 
-  const response = await fetch(url, {
-    next: { revalidate: 3600 },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok) return [];
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (err) {
+    console.warn("arXiv fetch failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
+  if (!response.ok) {
+    console.warn(`arXiv API returned ${response.status}: ${response.statusText}`);
+    return [];
+  }
 
   const xml = await response.text();
 
