@@ -12,7 +12,7 @@ import { calculateDynamicParams } from "@/lib/pipeline/score";
 import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
 
 /**
- * Uses gemini-2.0-flash-lite to assess whether the user's query is vague and,
+ * Uses gemini-2.5-flash-lite to assess whether the user's query is vague and,
  * if so, rewrites it into a precise, academic-grade search query.
  * Returns the original query if refinement fails.
  */
@@ -50,7 +50,7 @@ Refined academic query:`;
         const response = await model.generateContent(prompt);
         return response.response.text().trim();
       },
-      "gemini-2.0-flash-lite"
+      "gemini-2.5-flash-lite"
     );
     // Sanity check: if the model returns something wildly long or empty, fall back
     if (!result || result.length > 300) return originalQuery;
