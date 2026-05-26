@@ -9,6 +9,46 @@ import { fetchSemanticScholarPapers } from "@/lib/pipeline/fetchers/semanticScho
 import { fetchSerpApiPapers } from "@/lib/pipeline/fetchers/serpapi";
 import type { RawPaper } from "@/types";
 import { calculateDynamicParams } from "@/lib/pipeline/score";
+import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
+
+/**
+ * Uses gemini-2.5-flash-lite to assess whether the user's query is vague and,
+ * if so, rewrites it into a precise, academic-grade search query.
+ * Returns the original query if refinement is unnecessary or fails.
+ */
+async function refineQueryIfNeeded(originalQuery: string): Promise<string> {
+  const prompt = `You are an expert academic research assistant. Your task is to evaluate a user's research query and improve it if it is vague, ambiguous, or too broad.
+
+Original query: "${originalQuery}"
+
+Instructions:
+1. If the query is already specific, technical, and suitable for academic database searches (arXiv, Semantic Scholar), return it UNCHANGED.
+2. If the query is vague, overly broad, or uses informal language, rewrite it into a precise, academic-grade search query. Add relevant technical terminology, specify the domain, and focus the scope.
+3. Return ONLY the final query string — no explanations, no quotes, no formatting. Just the raw query text.
+
+Examples of vague → refined:
+- "AI in medicine" → "deep learning applications in medical image segmentation and clinical decision support"
+- "climate stuff" → "climate change impacts on biodiversity and ecosystem resilience"
+- "quantum computers" → "quantum error correction algorithms for fault-tolerant quantum computing"
+
+Now evaluate and return the best query:`;
+
+  try {
+    const result = await executeWithGeminiFallback(
+      async (model) => {
+        const response = await model.generateContent(prompt);
+        return response.response.text().trim();
+      },
+      "gemini-2.5-flash-lite-preview-06-17"
+    );
+    // Sanity check: if the model returns something wildly long or empty, fall back
+    if (!result || result.length > 300) return originalQuery;
+    return result;
+  } catch {
+    // Refinement is a best-effort step — never block the pipeline
+    return originalQuery;
+  }
+}
 
 const schema = z.object({
   chatId: z.string(),
@@ -42,7 +82,27 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const query = settings.topic;
+        const originalQuery = settings.topic;
+
+        // ── Query refinement ──────────────────────────────────────────────────
+        // Use gemini-2.5-flash-lite to assess whether the query is vague and
+        // sharpen it into a precise academic search query before hitting the
+        // paper fetchers. This runs as a lightweight pre-flight step.
+        send(controller, "step", { step: "fetching", message: `Analysing query with Gemini...` });
+        const query = await refineQueryIfNeeded(originalQuery);
+        const wasRefined = query.toLowerCase().trim() !== originalQuery.toLowerCase().trim();
+
+        if (wasRefined) {
+          send(controller, "step", {
+            step: "fetching",
+            message: `Query refined: "${originalQuery}" → "${query}"`,
+          });
+        } else {
+          send(controller, "step", {
+            step: "fetching",
+            message: `Query is already specific — using as-is: "${query}"`,
+          });
+        }
 
         send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${query}"...` });
         
