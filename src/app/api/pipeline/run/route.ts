@@ -151,11 +151,6 @@ export async function POST(request: Request) {
           });
           const internalRanked = await rankPapers(deduped, settings, queryEmbedding);
 
-          // ── Transparent: send Pass 1 intermediate results to the client ────
-          // These are ephemeral — NOT saved to the database. The client will
-          // display them only during the scoring phase.
-          send(controller, "pass1_papers", internalRanked);
-
           // Quality filter — drop the bottom 40%, but never let the pool fall
           // below maxPapers.  internalRanked is already sorted best → worst by
           // Pass 1, so slicing the top-N is equivalent to the score threshold

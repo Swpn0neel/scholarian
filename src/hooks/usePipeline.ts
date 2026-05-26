@@ -7,7 +7,6 @@ import { useResearchStore, type QAMessage, type CompletedRun } from "./useResear
 type StreamEvent =
   | { event: "step"; data: { step: string; message: string } }
   | { event: "papers"; data: RankedPaper[] }
-  | { event: "pass1_papers"; data: RankedPaper[] }
   | { event: "report"; data: { chunk: string } }
   | { event: "done"; data: { runId?: string; reportId?: string; content?: string } }
   | { event: "reset"; data?: Record<string, never> }
@@ -257,7 +256,6 @@ export function usePipeline(chatId: string) {
 
     await readSseResponse(response, (message) => {
       if (message.event === "step") store.setStep(message.data.step as never, message.data.message);
-      if (message.event === "pass1_papers") store.setPass1Papers(message.data);
       if (message.event === "papers") {
         store.setPapers(message.data);
         store.addEvent("ranked", `Ranked ${message.data.length} papers by composite score.`);

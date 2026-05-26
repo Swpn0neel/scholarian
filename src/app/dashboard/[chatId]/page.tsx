@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { ArrowDown } from "lucide-react";
 import { CompletedRunCard } from "@/components/dashboard/CompletedRunCard";
 import { FeedbackInput } from "@/components/dashboard/FeedbackInput";
-import { Pass1RankingTable } from "@/components/dashboard/Pass1RankingTable";
 import { PipelineProgress } from "@/components/dashboard/PipelineProgress";
 import { QAThread } from "@/components/dashboard/QAThread";
 import { RankedPapersTable } from "@/components/dashboard/RankedPapersTable";
@@ -274,14 +273,6 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
               events={pipeline.events}
               isRunning={pipeline.isRunning}
             />
-
-            {/* ── Transparent: Pass 1 intermediate ranking table ── */}
-            {/* Shown only during the scoring phase when two-pass ranking is active.
-                Disappears automatically when Pass 2 completes (pass1Papers is cleared
-                by setPapers). Data is ephemeral — never saved to the database. */}
-            {pipeline.pass1Papers.length > 0 && pipeline.step === "scoring" && (
-              <Pass1RankingTable papers={pipeline.pass1Papers} qualityThresholdPct={40} />
-            )}
 
             <RankedPapersTable
               papers={pipeline.papers}
