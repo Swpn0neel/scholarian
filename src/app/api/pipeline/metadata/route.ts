@@ -10,6 +10,8 @@ const settingsSchema = z.object({
   weightRelevance: z.number(),
   weightCitation: z.number(),
   weightRecency: z.number(),
+  enhanceQuery: z.boolean().optional(),
+  enhanceReport: z.boolean().optional(),
 });
 
 const schema = z.object({
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
       weight_relevance: body.settings.weightRelevance,
       weight_citation: body.settings.weightCitation,
       weight_recency: body.settings.weightRecency,
+      enhance_query: body.settings.enhanceQuery ?? false,
+      enhance_report: body.settings.enhanceReport ?? false,
       events: body.events,
     },
     { onConflict: "run_id" }

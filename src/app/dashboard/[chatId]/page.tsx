@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useMemo, useRef } from "react";
+import { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { ArrowDown } from "lucide-react";
 import { CompletedRunCard } from "@/components/dashboard/CompletedRunCard";
@@ -136,6 +136,17 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
   const scrollToBottom = useCallback(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, []);
+
+  // Auto-scroll as content streams in, unless user scrolled up
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    
+    // Only auto-scroll if we are currently running the pipeline and the user is at the bottom
+    if (pipeline.isRunning && isAtBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+    }
+  }, [pipeline.reportMarkdown, pipeline.events, pipeline.papers, pipeline.isRunning, isAtBottom]);
 
   // Group messages by runId for easy rendering
   const { messages } = pipeline;

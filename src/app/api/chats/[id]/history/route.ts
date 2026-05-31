@@ -68,7 +68,7 @@ export async function GET(
   // Fetch run metadata (settings + events) for all runs in this chat
   const { data: allMetadata } = await supabase
     .from("run_metadata")
-    .select("run_id, topic, max_papers, top_k, weight_relevance, weight_citation, weight_recency, events, created_at")
+    .select("run_id, topic, max_papers, top_k, weight_relevance, weight_citation, weight_recency, enhance_query, enhance_report, events, created_at")
     .eq("chat_id", chatId)
     .order("created_at", { ascending: true });
 
@@ -98,7 +98,7 @@ export async function GET(
 
   // Map run_metadata (settings + events) to run_ids
   const metaByRunId: Record<string, {
-    settings: { topic: string; maxPapers: number; topK: number; weightRelevance: number; weightCitation: number; weightRecency: number };
+    settings: { topic: string; maxPapers: number; topK: number; weightRelevance: number; weightCitation: number; weightRecency: number; enhanceQuery?: boolean; enhanceReport?: boolean; };
     events: Array<{ step: string; message: string; ts: number }>;
     createdAt: number;
   }> = {};
@@ -111,6 +111,8 @@ export async function GET(
         weightRelevance: m.weight_relevance ?? 0.5,
         weightCitation: m.weight_citation ?? 0.3,
         weightRecency: m.weight_recency ?? 0.2,
+        enhanceQuery: m.enhance_query ?? false,
+        enhanceReport: m.enhance_report ?? false,
       },
       events: (m.events as Array<{ step: string; message: string; ts: number }>) ?? [],
       createdAt: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
