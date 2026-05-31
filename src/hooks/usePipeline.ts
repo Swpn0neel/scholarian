@@ -158,8 +158,8 @@ export function usePipeline(chatId: string) {
             topic: r.settings?.topic ?? data.chatTitle ?? `Run ${i + 1}`,
             settings: r.settings ?? {
               topic: "",
-              maxPapers: 50,
-              topK: 5,
+              maxPapers: 20,
+              topK: 3,
               weightRelevance: 0.5,
               weightCitation: 0.3,
               weightRecency: 0.2,
@@ -308,6 +308,7 @@ export function usePipeline(chatId: string) {
         runId: activeRunId, 
         chatId, 
         topic: store.settings.topic, 
+        enhanceReport: store.settings.enhanceReport,
         papers,
         isCustomRun,
         allPapers: isCustomRun ? store.papers : undefined,
@@ -317,6 +318,9 @@ export function usePipeline(chatId: string) {
     });
     if (!response.ok) { store.setStep("error", `Report request failed: ${response.statusText}`); return; }
     await readSseResponse(response, (message) => {
+      if (message.event === "step") {
+        store.setStep(message.data.step as never, message.data.message);
+      }
       if (message.event === "reset") {
         store.clearReport();
       }

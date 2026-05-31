@@ -277,6 +277,7 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
             <RankedPapersTable
               papers={pipeline.papers}
               topK={Math.min(pipeline.settings.topK, pipeline.papers.length)}
+              maxPapers={pipeline.settings.maxPapers}
               canGenerate={Boolean(pipeline.currentRunId) && !pipeline.isRunning}
               onGenerateReport={() =>
                 pipeline.currentRunId

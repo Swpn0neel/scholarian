@@ -9,9 +9,6 @@
  *  - Idea 5: Exponential recency decay with a dynamic half-life
  */
 
-// ─── Fallback defaults (used when no cohort data is available) ────────────────
-const DEFAULT_RECENCY_WINDOW_YEARS = 12;
-const DEFAULT_RECENCY_HALF_LIFE = 5;      // years at which recency score = 0.5
 
 // ─── Source credibility weights ───────────────────────────────────────────────
 const SOURCE_CREDIBILITY: Record<string, number> = {
@@ -52,86 +49,40 @@ export function abstractQualityMultiplier(abstract: string | null): number {
   return 0.65;
 }
 
-// ─── Idea 2: Percentile-rank citation score ───────────────────────────────────
+// ─── Idea 2: Logarithmic citation score ───────────────────────────────────────
 /**
- * Scores a paper by its cohort percentile rank on citations-per-year.
- *
- * Instead of a hard cap that collapses high-citation outliers to the same
- * score as moderately-cited papers, this converts each paper's cit/yr into
- * its fractional rank within the sorted cohort array:
- *
- *   score = (number of cohort papers with lower cit/yr) / total_papers
- *
- * A paper at the 95th percentile scores 0.95; the median paper scores 0.50.
- * This preserves full ordering information while remaining cohort-relative.
+ * Scores a paper using a simple logarithmic function without a hard cap.
+ * It is normalised against the max citations-per-year in the current cohort
+ * to keep the output roughly in the [0, 1] range.
  *
  * @param citationCount  Raw citation count for the paper
  * @param year           Publication year (null → treated as age 1)
- * @param citPerYearSorted  Sorted ascending array of cit/yr for the whole cohort
+ * @param maxCitPerYearInCohort The max citations-per-year in the fetched pool
  */
 export function citationScore(
   citationCount: number,
   year: number | null,
-  citPerYearSorted: number[]
+  maxCitPerYearInCohort: number
 ): number {
-  if (citPerYearSorted.length === 0) return 0;
-
   const currentYear = new Date().getFullYear();
   const ageFactor   = year ? Math.max(1, currentYear - year) : 1;
   const citPerYear  = citationCount / ageFactor;
 
-  // Count how many cohort papers have strictly lower cit/yr
-  let rank = 0;
-  for (const v of citPerYearSorted) {
-    if (v < citPerYear) rank++;
-    else break; // array is sorted
-  }
-
-  return rank / citPerYearSorted.length;
+  if (maxCitPerYearInCohort <= 0) return 0;
+  return Math.log1p(citPerYear) / Math.log1p(maxCitPerYearInCohort);
 }
 
-// ─── Pass 1 only: simple log-normalised citation score ────────────────────────
+// ─── Idea 5: Simple logarithmic recency decay ────────────────────────────────
 /**
- * A self-contained citation signal for Pass 1 filtering.
- *
- * Pass 1's only goal is to select the top-N candidates to hand to Pass 2.
- * Percentile-ranking (citationScore) is unnecessary there because:
- *  - It requires the full cohort array, which is discarded after filtering.
- *  - The cohort changes in Pass 2 anyway, so Pass 1 percentiles don't predict
- *    Pass 2 percentiles reliably.
- *  - The filtering decision just needs directional accuracy, not cohort precision.
- *
- * This function maps citations-per-year onto [0, 1] via log1p, with a soft
- * ceiling at MAX_CIT_PER_YEAR.  Papers with 0 citations score 0; anything at
- * or above the ceiling saturates at 1.  No cohort array needed.
- */
-const PASS1_MAX_CIT_PER_YEAR = 1000;
-
-export function simpleCitationScore(
-  citationCount: number,
-  year: number | null
-): number {
-  const currentYear = new Date().getFullYear();
-  const age        = year ? Math.max(1, currentYear - year) : 1;
-  const citPerYear = citationCount / age;
-  return Math.min(1, Math.log1p(citPerYear) / Math.log1p(PASS1_MAX_CIT_PER_YEAR));
-}
-
-// ─── Idea 5: Exponential recency decay ───────────────────────────────────────
-/**
- * Computes an exponential decay score using a dynamic half-life.
- * A paper published exactly `halfLife` years ago receives a score of 0.5.
- * Papers published in the current year receive ≈ 1.0; future-dated → capped 1.0.
+ * Computes a recency score using simple inverse logarithmic decay without a hard cap.
+ * Age 0 receives 1.0. Older papers gracefully decay towards 0 over time.
  */
 export function recencyScore(
-  year: number | null,
-  halfLife = DEFAULT_RECENCY_HALF_LIFE
+  year: number | null
 ): number {
   if (!year) return 0;
-  const age = new Date().getFullYear() - year;
-  if (age < 0) return 1.0;                          // future-dated → max
-  const lambda = Math.LN2 / halfLife;
-  return Math.exp(-lambda * age);
+  const age = Math.max(0, new Date().getFullYear() - year);
+  return 1 / Math.log2(2 + age);
 }
 
 // ─── Ideas 3 & 4: Source credibility + multi-source boost ────────────────────
@@ -162,45 +113,15 @@ export function sourceCredibilityMultiplier(source: string): number {
 
 // ─── Dynamic parameter calculation ───────────────────────────────────────────
 /**
- * Derives all dynamic scoring parameters from the fetched paper cohort:
- *  - citPerYearSorted:  ascending sorted array of cit/yr (used for percentile rank)
- *  - recencyWindow:     span from oldest paper to today  (clamped 3 – 25 yr)
- *  - recencyHalfLife:   half of recencyWindow            (clamped 2 – 12 yr)
+ * Calculates the maximum citations-per-year in the cohort.
  */
-export function calculateDynamicParams(
+export function calculateMaxCitPerYear(
   papers: Array<{ citationCount: number; year: number | null }>
-): { citPerYearSorted: number[]; recencyWindow: number; recencyHalfLife: number } {
-  if (papers.length === 0) {
-    return {
-      citPerYearSorted: [],
-      recencyWindow:    DEFAULT_RECENCY_WINDOW_YEARS,
-      recencyHalfLife:  DEFAULT_RECENCY_HALF_LIFE,
-    };
-  }
-
+): number {
   const currentYear = new Date().getFullYear();
-
-  // Idea 2 — sorted cit/yr array for percentile rank scoring
-  const citPerYearSorted = papers
-    .map((p) => {
-      const ageFactor = p.year ? Math.max(1, currentYear - p.year) : 1;
-      return p.citationCount / ageFactor;
-    })
-    .sort((a, b) => a - b);
-
-  // Idea 5 — dynamic recency window from cohort age span
-  const years = papers
-    .map((p) => p.year)
-    .filter((y): y is number => typeof y === "number" && y > 0);
-
-  let recencyWindow = DEFAULT_RECENCY_WINDOW_YEARS;
-  if (years.length > 0) {
-    const minYear = Math.min(...years);
-    recencyWindow = Math.max(3, Math.min(25, currentYear - minYear));
-  }
-
-  // Dynamic half-life = half the window, clamped between 2 and 12 years
-  const recencyHalfLife = Math.max(2, Math.min(12, recencyWindow / 2));
-
-  return { citPerYearSorted, recencyWindow, recencyHalfLife };
+  return papers.reduce((max, p) => {
+    const ageFactor = p.year ? Math.max(1, currentYear - p.year) : 1;
+    const citPerYear = p.citationCount / ageFactor;
+    return Math.max(max, citPerYear);
+  }, 0);
 }

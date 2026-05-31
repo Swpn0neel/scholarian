@@ -23,6 +23,8 @@ import {
   Sparkles,
   Binary,
   ScanSearch,
+  Wand2,
+  CheckCheck,
 } from "lucide-react";
 import type { PipelineStep } from "@/types";
 import { cn } from "@/lib/utils";
@@ -72,6 +74,30 @@ interface TagConfig {
 // ── fetching ──────────────────────────────────────────────────────────────────
 function classifyFetching(msg: string): TagConfig {
   const m = msg.toLowerCase();
+  if (m.includes("analysing query") || m.includes("analyzing query"))
+    return {
+      label: "ANALYSE", Icon: Wand2,
+      badgeClass: "bg-purple-50 text-purple-600",
+      iconClass:  "text-purple-400",
+      textClass:  "text-purple-700",
+      rowClass:   "bg-purple-50/30",
+    };
+  if (m.includes("query refined:"))
+    return {
+      label: "REFINED", Icon: Wand2,
+      badgeClass: "bg-purple-100 text-purple-700",
+      iconClass:  "text-purple-500",
+      textClass:  "text-purple-800",
+      rowClass:   "bg-purple-50/50",
+    };
+  if (m.includes("already specific"))
+    return {
+      label: "PRECISE", Icon: CheckCheck,
+      badgeClass: "bg-emerald-50 text-emerald-600",
+      iconClass:  "text-emerald-400",
+      textClass:  "text-emerald-700",
+      rowClass:   "bg-emerald-50/30",
+    };
   if (m.includes("preparing") || m.includes("fetching papers"))
     return {
       label: "QUERY", Icon: Zap,
@@ -241,7 +267,24 @@ function classifyReportReady(_msg: string): TagConfig {
 }
 
 // ── generating_report ─────────────────────────────────────────────────────────
-function classifyGeneratingReport(_msg: string): TagConfig {
+function classifyGeneratingReport(msg: string): TagConfig {
+  const m = msg.toLowerCase();
+  if (m.includes("designing") || m.includes("analytical lens"))
+    return {
+      label: "ANALYSE", Icon: Wand2,
+      badgeClass: "bg-purple-50 text-purple-600",
+      iconClass:  "text-purple-400",
+      textClass:  "text-purple-700",
+      rowClass:   "bg-purple-50/30",
+    };
+  if (m.includes("enhanced report prompt"))
+    return {
+      label: "ENHANCED", Icon: Sparkles,
+      badgeClass: "bg-purple-100 text-purple-700",
+      iconClass:  "text-purple-500",
+      textClass:  "text-purple-800",
+      rowClass:   "bg-purple-50/50",
+    };
   return {
     label: "GEN", Icon: Sparkles,
     badgeClass: "bg-primary/10 text-primary",

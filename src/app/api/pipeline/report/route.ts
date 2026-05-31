@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildReportPrompt } from "@/lib/pipeline/report";
-import { executeGeminiStreamWithFallback } from "@/lib/pipeline/gemini";
+import { executeGeminiStreamWithFallback, executeWithGeminiFallback } from "@/lib/pipeline/gemini";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { RankedPaper } from "@/types";
@@ -35,15 +35,34 @@ const schema = z.object({
   allPapers: z.array(z.any()).optional(),
   settings: z.any().optional(),
   events: z.array(z.any()).optional(),
+  enhanceReport: z.boolean().optional(),
 });
 
 function send(controller: ReadableStreamDefaultController, event: string, data: unknown) {
   controller.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 }
 
+async function generatePromptEnhancement(topic: string): Promise<string> {
+  const prompt = `You are a master research director. I am about to write a comprehensive literature review on the topic: "${topic}".
+Provide 3-4 highly specific analytical lenses, domain-specific evaluation criteria, or critical perspectives that an expert would use when reviewing papers in this exact field.
+Keep it under 100 words. Return ONLY the instructions.`;
+
+  try {
+    const result = await executeWithGeminiFallback(async (model) => {
+      const response = await model.generateContent(prompt);
+      return response.response.text().trim();
+    }, "gemini-2.5-flash-lite");
+    return result || "";
+  } catch (error) {
+    console.warn("Failed to generate prompt enhancement, falling back to empty instructions.", error);
+    return "";
+  }
+}
+
 async function* streamGeminiReport(
   papers: RankedPaper[],
-  topic: string
+  topic: string,
+  enhancedInstructions: string
 ): AsyncGenerator<string> {
 
 
@@ -52,7 +71,7 @@ async function* streamGeminiReport(
   const prompt = `You are an expert academic research analyst. Based on the following ranked papers, write a comprehensive research report in Markdown format.
 
 Topic: "${topic}"
-
+${enhancedInstructions ? `\n### Specific Analytical Lenses for this Topic:\n${enhancedInstructions}\n` : ""}
 Paper corpus (ranked by relevance, citation strength, and recency):
 ${paperContext}
 
@@ -60,7 +79,7 @@ Write a well-structured report with these sections:
 1. Executive Summary (3–4 sentences)
 2. Background & Core Concepts
 3. Key Findings & Synthesis (discuss themes, consensus, and contradictions)
-4. Comparative Analysis (You MUST include a comprehensive Markdown comparison table comparing all the listed papers with each other. The table should have columns for: [Rank], Title, Authors & Year, Methodology/Approach, Key Findings/Results, and Main Strengths/Limitations. Follow the table with a comparative narrative referring to specific papers by [Rank].)
+4. Comparative Analysis (You MUST include a comprehensive Markdown comparison table comparing all the listed papers with each other. The table should have columns for: [Rank], Title, Authors & Year, Methodology/Approach, Key Findings/Results, and Main Strengths/Limitations. IMPORTANT: Do NOT generate excessive or infinite dashes for the table separator. Use exactly "|---|---|---|---|---|---|" for the separator. Follow the table with a comparative narrative referring to specific papers by [Rank].)
 5. Research Gaps & Open Questions
 6. Future Research Directions
 7. Conclusion
@@ -76,7 +95,7 @@ export async function POST(request: Request) {
   if (auth instanceof NextResponse) return auth;
 
   const body = schema.parse(await request.json());
-  const { runId, chatId, topic = "research topic", isCustomRun, allPapers, settings, events } = body;
+  const { runId, chatId, topic = "research topic", enhanceReport, isCustomRun, allPapers, settings, events } = body;
   
   const supabase = await createServerSupabaseClient();
 
@@ -125,8 +144,18 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        let enhancedInstructions = "";
+        if (enhanceReport) {
+          send(controller, "step", { step: "generating_report", message: "Designing domain-specific analytical lens..." });
+          enhancedInstructions = await generatePromptEnhancement(topic);
+          if (enhancedInstructions) {
+            send(controller, "step", { step: "generating_report", message: "Enhanced report prompt with domain-specific criteria." });
+          }
+        }
+        send(controller, "step", { step: "generating_report", message: "Synthesizing report..." });
+
         let fullReport = "";
-        for await (const chunk of streamGeminiReport(papers, topic)) {
+        for await (const chunk of streamGeminiReport(papers, topic, enhancedInstructions)) {
           if (chunk === "__STREAM_RESET__") {
             fullReport = "";
             send(controller, "reset", {});

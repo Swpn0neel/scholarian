@@ -18,6 +18,8 @@ export interface ResearchSettings {
   weightRelevance: number;
   weightCitation: number;
   weightRecency: number;
+  enhanceQuery?: boolean;
+  enhanceReport?: boolean;
 }
 
 export interface Chat {
@@ -70,9 +72,11 @@ export interface IntentResult {
 
 export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
   topic: "",
-  maxPapers: 50,
-  topK: 10,
-  weightRelevance: 0.4,
-  weightCitation: 0.25,
-  weightRecency: 0.35,
+  maxPapers: 20,
+  topK: 3,
+  weightRelevance: 0.5,
+  weightCitation: 0.3,
+  weightRecency: 0.2,
+  enhanceQuery: false,
+  enhanceReport: false,
 };

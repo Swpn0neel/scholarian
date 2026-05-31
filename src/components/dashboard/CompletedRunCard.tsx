@@ -97,6 +97,7 @@ export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: P
             <RankedPapersTable
               papers={run.papers}
               topK={Math.min(run.settings?.topK ?? 5, paperCount)}
+              maxPapers={run.settings?.maxPapers ?? paperCount}
               canGenerate={false}
             />
           </div>

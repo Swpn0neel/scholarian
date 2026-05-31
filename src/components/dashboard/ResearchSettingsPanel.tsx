@@ -77,7 +77,37 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
         <div className="overflow-hidden">
           <div className="space-y-4 pt-5">
             <label className="block">
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-secondary">Topic</span>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="block text-xs font-bold uppercase tracking-[0.18em] text-secondary">Topic</span>
+                <div className="flex gap-4 items-center mb-2">
+                  <label className="flex cursor-pointer items-center gap-2" title="Automatically enrich vague queries for better results">
+                    <span className="text-xs font-semibold text-secondary">Query Enhance</span>
+                    <div className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={settings.enhanceQuery ?? false}
+                        onChange={(e) => onChange({ enhanceQuery: e.target.checked })}
+                        className="peer sr-only"
+                      />
+                      <div className="h-5 w-9 rounded-full bg-secondary/20 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20"></div>
+                      <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+                    </div>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2" title="Dynamically enhance report structure based on topic">
+                    <span className="text-xs font-semibold text-secondary">Report Enhance</span>
+                    <div className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={settings.enhanceReport ?? false}
+                        onChange={(e) => onChange({ enhanceReport: e.target.checked })}
+                        className="peer sr-only"
+                      />
+                      <div className="h-5 w-9 rounded-full bg-secondary/20 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20"></div>
+                      <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+                    </div>
+                  </label>
+                </div>
+              </div>
               <textarea
                 value={settings.topic}
                 onChange={(event) => onChange({ topic: event.target.value })}
@@ -117,7 +147,7 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
                     min="0"
                     max="1"
                     step="0.05"
-                    value={settings[key as keyof ResearchSettings]}
+                    value={settings[key as "weightRelevance" | "weightCitation" | "weightRecency"]}
                     onChange={(event) => onChange({ [key]: Number(event.target.value) })}
                     className="h-9 border-secondary/10 bg-white text-on-surface"
                   />

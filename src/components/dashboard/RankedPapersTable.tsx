@@ -22,11 +22,13 @@ function SortIcon({ sortKey, column, sortDir }: { sortKey: SortKey; column: Sort
 export function RankedPapersTable({
   papers,
   topK,
+  maxPapers,
   onGenerateReport,
   canGenerate,
 }: {
   papers: RankedPaper[];
   topK: number;
+  maxPapers: number;
   onGenerateReport?: () => void;
   canGenerate: boolean;
 }) {
@@ -34,6 +36,7 @@ export function RankedPapersTable({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedPaper, setSelectedPaper] = useState<RankedPaper | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const dynamicParams = useMemo(() => {
     if (papers.length === 0) return null;
@@ -124,7 +127,8 @@ export function RankedPapersTable({
   }
 
   const sorted = useMemo(() => {
-    return [...papers].sort((a, b) => {
+    const visiblePapers = showAll ? papers : [...papers].sort((a, b) => a.rank - b.rank).slice(0, maxPapers);
+    return visiblePapers.sort((a, b) => {
       const aValue = a[sortKey];
       const bValue = b[sortKey];
       let comparison: number;
@@ -135,7 +139,7 @@ export function RankedPapersTable({
       }
       return sortDir === "asc" ? comparison : -comparison;
     });
-  }, [papers, sortKey, sortDir]);
+  }, [papers, sortKey, sortDir, showAll, maxPapers]);
 
   if (!papers.length) return null;
 
@@ -149,7 +153,23 @@ export function RankedPapersTable({
             <span>Top {topK} highlighted for report generation.</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          {papers.length > maxPapers && (
+            <label className="flex cursor-pointer items-center gap-2" title="Show all fetched and ranked papers">
+              <span className="text-xs font-semibold text-secondary">Show all ({papers.length})</span>
+              <div className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={showAll}
+                  onChange={(e) => setShowAll(e.target.checked)}
+                  className="peer sr-only"
+                />
+                <div className="h-5 w-9 rounded-full bg-secondary/20 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20"></div>
+                <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+              </div>
+            </label>
+          )}
+          <div className="flex items-center gap-2">
           <Button
             variant="outline"
             onClick={handleCopy}
@@ -162,9 +182,10 @@ export function RankedPapersTable({
               <><Copy className="size-4" /><span>Copy Table</span></>
             )}
           </Button>
-          <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
-            Generate Report
-          </Button>
+            <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
+              Generate Report
+            </Button>
+          </div>
         </div>
       </div>
 

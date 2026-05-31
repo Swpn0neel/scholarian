@@ -1,14 +1,67 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deduplicatePapers } from "@/lib/pipeline/deduplicate";
-import { rankPapers, rankPapersPass1, embedQuery } from "@/lib/pipeline/rank";
+import { rankPapers, embedQuery } from "@/lib/pipeline/rank";
 import { requireAuth } from "@/lib/supabase/requireAuth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { fetchArxivPapers } from "@/lib/pipeline/fetchers/arxiv";
 import { fetchSemanticScholarPapers } from "@/lib/pipeline/fetchers/semanticScholar";
 import { fetchSerpApiPapers } from "@/lib/pipeline/fetchers/serpapi";
 import type { RawPaper } from "@/types";
-import { calculateDynamicParams } from "@/lib/pipeline/score";
+import { executeWithGeminiFallback } from "@/lib/pipeline/gemini";
+
+/**
+ * Uses gemini-2.5-flash-lite to assess whether the user's query is vague and,
+ * if so, rewrites it into a precise, academic-grade search query.
+ * Returns the original query if refinement fails.
+ */
+async function refineQueryIfNeeded(originalQuery: string): Promise<string> {
+  const wordCount = originalQuery.trim().split(/\s+/).length;
+
+  const prompt = `You are an expert academic research librarian. Your job is to transform a user's research topic into a rich, precise academic search query optimised for databases like arXiv and Semantic Scholar.
+
+User's topic: "${originalQuery}"
+
+Rules:
+1. ALWAYS expand and enrich the query — even if it already sounds technical. Short queries (fewer than 6 words) are ALWAYS too vague and MUST be expanded significantly.
+2. Add specific techniques, methods, algorithms, or sub-domains relevant to the topic.
+3. Include application context or problem framing where it helps narrow the scope.
+4. Use terminology that would appear in academic paper titles and abstracts.
+5. Keep the final query under 20 words.
+6. Return ONLY the refined query — no explanation, no quotes, no bullet points. Just the raw query text.
+
+Examples:
+- "image encryption" → "chaos-based image encryption algorithms using hyperchaotic maps and pixel scrambling"
+- "AI in medicine" → "deep learning for medical image segmentation and clinical decision support systems"
+- "quantum computers" → "quantum error correction algorithms for fault-tolerant superconducting qubit systems"
+- "climate change" → "climate change impacts on ecosystem resilience and biodiversity loss mechanisms"
+- "drug discovery" → "machine learning approaches for molecular property prediction and de novo drug design"
+- "neural networks" → "deep neural network architectures for image classification and transfer learning"
+- "blockchain security" → "blockchain consensus mechanisms and smart contract vulnerability detection"
+
+Current query word count: ${wordCount} word${wordCount === 1 ? "" : "s"} — ${wordCount < 6 ? "DEFINITELY too short, must be expanded significantly" : "may still need enrichment"}.
+
+Refined academic query:`;
+
+  try {
+    const result = await executeWithGeminiFallback(
+      async (model) => {
+        const response = await model.generateContent(prompt);
+        return response.response.text().trim();
+      },
+      "gemini-2.5-flash-lite"
+    );
+    // Sanity check: if the model returns something wildly long or empty, fall back
+    if (!result || result.length > 300) return originalQuery;
+    // Strip any accidental leading/trailing quotes the model may add
+    const cleaned = result.replace(/^["']|["']$/g, "").trim();
+    return cleaned || originalQuery;
+  } catch {
+    // Refinement is a best-effort step — never block the pipeline
+    return originalQuery;
+  }
+}
+
 
 const schema = z.object({
   chatId: z.string(),
@@ -20,6 +73,7 @@ const schema = z.object({
     weightRelevance: z.number().min(0),
     weightCitation: z.number().min(0),
     weightRecency: z.number().min(0),
+    enhanceQuery: z.boolean().optional().default(false),
   }),
 });
 
@@ -42,7 +96,26 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const query = settings.topic;
+        const originalQuery = settings.topic;
+        let query = originalQuery;
+
+        if (settings.enhanceQuery) {
+          send(controller, "step", { step: "fetching", message: `Analysing query with Gemini...` });
+          query = await refineQueryIfNeeded(originalQuery);
+          const wasRefined = query.toLowerCase().trim() !== originalQuery.toLowerCase().trim();
+
+          if (wasRefined) {
+            send(controller, "step", {
+              step: "fetching",
+              message: `Query refined: "${originalQuery}" → "${query}"`,
+            });
+          } else {
+            send(controller, "step", {
+              step: "fetching",
+              message: `Query is already specific — using as-is: "${query}"`,
+            });
+          }
+        }
 
         send(controller, "step", { step: "fetching", message: `Fetching papers using query: "${query}"...` });
         
@@ -109,87 +182,13 @@ export async function POST(request: Request) {
 
         send(controller, "step", { step: "embedding", message: "Embeddings complete. Comparing vector distances..." });
 
-        // ── Ranking strategy ──────────────────────────────────────────────────
-        // If the deduplicated pool already fits within maxPapers, there is
-        // nothing to trim — rank everything in a single pass and show it all.
-        //
-        // Only when the pool EXCEEDS maxPapers do we run a two-pass approach:
-        //   Pass 1 — score the full pool (cohort-relative stats are accurate
-        //             because every candidate participates).
-        //   Quality filter — drop the bottom 40% of the score distribution so
-        //             genuinely weak papers (low relevance + low citations +
-        //             very old) never reach the user.
-        //   Cap — take the top-N survivors.
-        //   Pass 2 — re-rank the final cohort so cohort-relative metrics
-        //             (percentile citations, dynamic recency half-life) reflect
-        //             the *final* set rather than the larger candidate pool.
+        // ── Single-pass ranking ───────────────────────────────────────────────
+        send(controller, "step", {
+          step: "scoring",
+          message: `Ranking all ${deduped.length} candidates directly.`,
+        });
 
-        let ranked: Awaited<ReturnType<typeof rankPapers>>;
-        let recencyWindow: number;
-        let recencyHalfLife: number;
-        let cappedCandidates: RawPaper[];
-
-        if (deduped.length <= settings.maxPapers) {
-          // ── Single-pass: pool already fits, rank everything ─────────────────
-          send(controller, "step", {
-            step: "scoring",
-            message: `Pool (${deduped.length} papers) fits within the ${settings.maxPapers}-paper limit — ranking all candidates directly.`,
-          });
-          const params = calculateDynamicParams(deduped);
-          recencyWindow    = params.recencyWindow;
-          recencyHalfLife  = params.recencyHalfLife;
-          cappedCandidates = deduped;
-          ranked = await rankPapers(deduped, settings, queryEmbedding);
-        } else {
-          // ── Two-pass: pool exceeds maxPapers, filter then re-rank ───────────
-
-          // Pass 1 — score the full pool
-          const { recencyWindow: rw1, recencyHalfLife: rhl1 } = calculateDynamicParams(deduped);
-          send(controller, "step", {
-            step: "scoring",
-            message: `Pass 1 — scoring all ${deduped.length} candidates (recency window: ${rw1} yrs · half-life: ${rhl1} yrs)...`,
-          });
-          const internalRanked = await rankPapersPass1(deduped, settings, queryEmbedding);
-
-          // Quality filter — drop the bottom 40%, but never let the pool fall
-          // below maxPapers.  internalRanked is already sorted best → worst by
-          // Pass 1, so slicing the top-N is equivalent to the score threshold
-          // while honouring the floor guarantee.
-          const targetDropCount = Math.floor(internalRanked.length * 0.4);
-          const keepCount       = Math.max(settings.maxPapers, internalRanked.length - targetDropCount);
-          const qualityFiltered = internalRanked.slice(0, keepCount);
-          const droppedCount    = internalRanked.length - qualityFiltered.length;
-
-          const filterMsg = droppedCount > 0
-            ? `Quality filter removed ${droppedCount} low-scoring papers. ${qualityFiltered.length} candidates remain.`
-            : `Quality filter: pool (${internalRanked.length}) too close to limit — keeping all to preserve ${settings.maxPapers}-paper target.`;
-
-          send(controller, "step", {
-            step: "scoring",
-            message: filterMsg,
-          });
-
-          // Cap to maxPapers and strip RankedPaper → RawPaper so the final
-          // re-rank pass gets a clean, uniform input (no stale scores bleeding in).
-          cappedCandidates = qualityFiltered
-            .slice(0, settings.maxPapers)
-            .map(({ simScore: _s, citationScore: _c, recencyScore: _r, finalScore: _f, rank: _rk, embedding: _e, ...raw }) => raw);
-
-          send(controller, "step", {
-            step: "scoring",
-            message: `Showing top ${cappedCandidates.length} papers (capped at ${settings.maxPapers}). Re-ranking final cohort...`,
-          });
-
-          // Pass 2 — re-rank the final cohort so cohort-relative scores are tight
-          const params = calculateDynamicParams(cappedCandidates);
-          recencyWindow   = params.recencyWindow;
-          recencyHalfLife = params.recencyHalfLife;
-          send(controller, "step", {
-            step: "scoring",
-            message: `Pass 2 — final ranking (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs)...`,
-          });
-          ranked = await rankPapers(cappedCandidates, settings, queryEmbedding);
-        }
+        const ranked = await rankPapers(deduped, settings, queryEmbedding);
         
         const runId = crypto.randomUUID();
         
@@ -225,9 +224,7 @@ export async function POST(request: Request) {
         // Persist run metadata (settings + events) immediately on the server so the
         // run is fully recoverable even if the user navigates away before the client
         // has a chance to call /api/pipeline/metadata.
-        const scoringEventMsg = deduped.length <= settings.maxPapers
-          ? `Pool (${ranked.length} papers) fit within ${settings.maxPapers}-paper limit — ranked directly.`
-          : `Pass 1 scored ${deduped.length} candidates; quality filter kept ${cappedCandidates.length}. Pass 2 re-ranked final cohort (recency window: ${recencyWindow} yrs · half-life: ${recencyHalfLife} yrs).`;
+        const scoringEventMsg = `Ranked all ${deduped.length} candidates directly.`;
 
         const pipelineEvents = [
           { step: "fetching",      message: `Sources returned: arXiv ${arxivPapers.length}, Semantic Scholar ${semanticPapers.length}, Google Scholar ${serpPapers.length}${failedSources.length ? ` · ⚠ ${failedSources.join(", ")} unavailable` : ""}.`, ts: Date.now() - 6000 },

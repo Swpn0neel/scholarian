@@ -1,11 +1,10 @@
 import type { RankedPaper, RawPaper, ResearchSettings } from "@/types";
 import {
   abstractQualityMultiplier,
-  calculateDynamicParams,
+  calculateMaxCitPerYear,
   citationScore,
   cosineSim,
   recencyScore,
-  simpleCitationScore,
   sourceCredibilityMultiplier,
 } from "./score";
 import { embedText, embedTexts } from "./embed";
@@ -49,10 +48,10 @@ export function hybridScore(
  *
  * Signal improvements over the baseline:
  *  - Idea 1: Abstract quality multiplier dampens short-snippet embeddings
- *  - Idea 2: Percentile-rank citation score (cohort-relative, preserves ordering)
+ *  - Idea 2: Logarithmic citation score
  *  - Idea 3: Source credibility multiplier on the final composite score
  *  - Idea 4: Multi-source cross-indexing bonus baked into credibility
- *  - Idea 5: Exponential recency decay using a dynamic cohort half-life
+ *  - Idea 5: Simple logarithmic recency decay
  */
 export async function rankPapers(
   papers:         RawPaper[],
@@ -67,7 +66,7 @@ export async function rankPapers(
   // Embed all papers in batches — embedTexts handles batching internally
   const paperEmbeddings = await embedTexts(paperTexts);
 
-  const { citPerYearSorted, recencyHalfLife } = calculateDynamicParams(papers);
+  const maxCitPerYearInCohort = calculateMaxCitPerYear(papers);
 
   return papers
     .map((paper, i) => {
@@ -82,11 +81,11 @@ export async function rankPapers(
       const qualityMult = abstractQualityMultiplier(paper.abstract);
       const simScore    = rawSim * qualityMult;
 
-      // Idea 2 — cohort percentile-rank citation score
-      const citScore = citationScore(paper.citationCount, paper.year, citPerYearSorted);
+      // Idea 2 — logarithmic citation score
+      const citScore = citationScore(paper.citationCount, paper.year, maxCitPerYearInCohort);
 
-      // Idea 5 — exponential recency decay with dynamic half-life
-      const recScore = recencyScore(paper.year, recencyHalfLife);
+      // Idea 5 — simple logarithmic recency decay
+      const recScore = recencyScore(paper.year);
 
       // Ideas 3 & 4 baked into hybridScore via sourceCredibilityMultiplier
       const finalScore = hybridScore(simScore, citScore, recScore, settings, paper.source);
@@ -114,15 +113,15 @@ export function rankPapersSync(
   settings:            ResearchSettings,
   similarityForPaper:  (paper: RawPaper) => number = () => 0.5
 ): RankedPaper[] {
-  const { citPerYearSorted, recencyHalfLife } = calculateDynamicParams(papers);
+  const maxCitPerYearInCohort = calculateMaxCitPerYear(papers);
 
   return papers
     .map((paper) => {
       const rawSim      = similarityForPaper(paper);
       const qualityMult = abstractQualityMultiplier(paper.abstract);
       const simScore    = rawSim * qualityMult;
-      const citScore    = citationScore(paper.citationCount, paper.year, citPerYearSorted);
-      const recScore    = recencyScore(paper.year, recencyHalfLife);
+      const citScore    = citationScore(paper.citationCount, paper.year, maxCitPerYearInCohort);
+      const recScore    = recencyScore(paper.year);
       const finalScore  = hybridScore(simScore, citScore, recScore, settings, paper.source);
 
       return {
@@ -141,59 +140,4 @@ export function rankPapersSync(
 /** Embed a query string for use with rankPapers / rankPapersPass1. */
 export { embedText as embedQuery };
 
-/**
- * Pass 1 ranking — uses simpleCitationScore instead of the cohort-percentile
- * citationScore.
- *
- * Pass 1’s only job is to select the best ≤ maxPapers candidates for Pass 2.
- * The cohort-relative percentile is unnecessary here because:
- *  – The cohort changes completely after the quality filter, so Pass 1
- *    percentiles don’t predict Pass 2 percentiles.
- *  – Directional accuracy (clearly weak papers score low) is all we need
- *    to make the filtering decision; the percentile adds no signal for that.
- *
- * Everything else (embeddings, abstract quality, recency, source credibility)
- * is identical to rankPapers().
- */
-export async function rankPapersPass1(
-  papers:         RawPaper[],
-  settings:       ResearchSettings,
-  queryEmbedding: number[]
-): Promise<RankedPaper[]> {
-  const paperTexts = papers.map((p) =>
-    p.abstract ? `${p.title}. ${p.abstract}` : p.title
-  );
 
-  const paperEmbeddings = await embedTexts(paperTexts);
-
-  // Only recency half-life is needed from dynamic params — no citPerYearSorted
-  const { recencyHalfLife } = calculateDynamicParams(papers);
-
-  return papers
-    .map((paper, i) => {
-      const embedding = paperEmbeddings[i] ?? [];
-
-      const rawSim      = queryEmbedding.length > 0 && embedding.length > 0
-        ? cosineSim(queryEmbedding, embedding)
-        : 0.5;
-      const qualityMult = abstractQualityMultiplier(paper.abstract);
-      const simScore    = rawSim * qualityMult;
-
-      // Simple log-normalised citation score — no cohort array needed
-      const citScore  = simpleCitationScore(paper.citationCount, paper.year);
-      const recScore  = recencyScore(paper.year, recencyHalfLife);
-      const finalScore = hybridScore(simScore, citScore, recScore, settings, paper.source);
-
-      return {
-        ...paper,
-        simScore,
-        citationScore: citScore,
-        recencyScore:  recScore,
-        finalScore,
-        rank:          0,
-        embedding,
-      };
-    })
-    .sort((a, b) => b.finalScore - a.finalScore)
-    .map((paper, index) => ({ ...paper, rank: index + 1 }));
-}
