@@ -42,10 +42,43 @@ function send(controller: ReadableStreamDefaultController, event: string, data: 
   controller.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
 }
 
-async function generatePromptEnhancement(topic: string): Promise<string> {
-  const prompt = `You are a master research director. I am about to write a comprehensive literature review on the topic: "${topic}".
-Provide 3-4 highly specific analytical lenses, domain-specific evaluation criteria, or critical perspectives that an expert would use when reviewing papers in this exact field.
-Keep it under 100 words. Return ONLY the instructions.`;
+async function generatePromptEnhancement(topic: string, papers: RankedPaper[]): Promise<string> {
+  // Build a compact snapshot (title + first 300 chars of abstract) for the enhancer
+  const paperSnapshot = papers
+    .slice(0, 10)
+    .map((p, i) => {
+      const snippet = p.abstract
+        ? p.abstract.slice(0, 300).trimEnd() + (p.abstract.length > 300 ? "…" : "")
+        : "No abstract.";
+      return `[${i + 1}] "${p.title}" (${p.year ?? "n/a"}, ${p.citationCount} citations)\n${snippet}`;
+    })
+    .join("\n\n");
+
+  const prompt = `You are a domain expert and senior academic editor preparing a detailed brief for a junior analyst who will write a literature review.
+
+Topic: "${topic}"
+
+Top papers being reviewed:
+${paperSnapshot}
+
+Produce a structured analytical brief that the analyst MUST apply when writing every section of the report. The brief must be:
+- Grounded in the actual papers above (not generic advice)
+- Specific enough that a different topic would produce a completely different brief
+- Actionable: each point should directly change what gets written
+
+Return EXACTLY this structure (no preamble, no extra text outside these sections):
+
+**DOMAIN EVALUATION CRITERIA**
+List 3-4 field-specific quality dimensions that distinguish strong papers in this area from weak ones. Be precise (e.g. "Evaluate whether encryption schemes prove CPA/CCA security formally" not just "assess rigor").
+
+**KEY DEBATES & FAULT LINES**
+Identify 2-3 genuine methodological disagreements, unresolved controversies, or competing paradigms visible in the papers above. Name specific tensions the analyst should surface.
+
+**CRITICAL METRICS & BENCHMARKS**
+List the 3-4 specific performance metrics, datasets, or evaluation benchmarks expert reviewers in this field expect to see compared. Flag if key papers above omit them.
+
+**SYNTHESIS DIRECTIVE**
+One precise instruction for how the analyst should frame the overall narrative arc — what argument or conclusion the synthesis should build toward given these specific papers.`;
 
   try {
     const result = await executeWithGeminiFallback(async (model) => {
@@ -64,25 +97,27 @@ async function* streamGeminiReport(
   topic: string,
   enhancedInstructions: string
 ): AsyncGenerator<string> {
-
-
   const paperContext = buildReportPrompt(papers);
 
   const prompt = `You are an expert academic research analyst. Based on the following ranked papers, write a comprehensive research report in Markdown format.
 
 Topic: "${topic}"
-${enhancedInstructions ? `\n### Specific Analytical Lenses for this Topic:\n${enhancedInstructions}\n` : ""}
+${
+  enhancedInstructions
+    ? `\n---\n## MANDATORY ANALYTICAL BRIEF\nApply every directive below throughout ALL sections of the report:\n${enhancedInstructions}\n---\n`
+    : ""
+}
 Paper corpus (ranked by relevance, citation strength, and recency):
 ${paperContext}
 
 Write a well-structured report with these sections:
-1. Executive Summary (3–4 sentences)
+1. Executive Summary (3-4 sentences)
 2. Background & Core Concepts
-3. Key Findings & Synthesis (discuss themes, consensus, and contradictions)
-4. Comparative Analysis (You MUST include a comprehensive Markdown comparison table comparing all the listed papers with each other. The table should have columns for: [Rank], Title, Authors & Year, Methodology/Approach, Key Findings/Results, and Main Strengths/Limitations. IMPORTANT: Do NOT generate excessive or infinite dashes for the table separator. Use exactly "|---|---|---|---|---|---|" for the separator. Follow the table with a comparative narrative referring to specific papers by [Rank].)
-5. Research Gaps & Open Questions
+3. Key Findings & Synthesis (discuss themes, consensus, and contradictions${enhancedInstructions ? " — surface the KEY DEBATES & FAULT LINES from the brief" : ""})
+4. Comparative Analysis (You MUST include a comprehensive Markdown comparison table comparing all the listed papers with each other. The table should have columns for: [Rank], Title, Authors & Year, Methodology/Approach, Key Findings/Results, and Main Strengths/Limitations. IMPORTANT: Do NOT generate excessive or infinite dashes for the table separator. Use exactly "|---|---|---|---|---|---|" for the separator. Follow the table with a comparative narrative referring to specific papers by [Rank].${enhancedInstructions ? " Use the CRITICAL METRICS & BENCHMARKS from the brief as the primary comparison dimensions." : ""})
+5. Research Gaps & Open Questions${enhancedInstructions ? " (apply DOMAIN EVALUATION CRITERIA to identify where papers fall short)" : ""}
 6. Future Research Directions
-7. Conclusion
+7. Conclusion${enhancedInstructions ? " (build toward the SYNTHESIS DIRECTIVE from the brief)" : ""}
 8. References (list all papers with rank, title, authors, year)
 
 Use markdown formatting. Be precise, analytical, and cite papers by [rank].`;
@@ -147,7 +182,7 @@ export async function POST(request: Request) {
         let enhancedInstructions = "";
         if (enhanceReport) {
           send(controller, "step", { step: "generating_report", message: "Designing domain-specific analytical lens..." });
-          enhancedInstructions = await generatePromptEnhancement(topic);
+          enhancedInstructions = await generatePromptEnhancement(topic, papers);
           if (enhancedInstructions) {
             send(controller, "step", { step: "generating_report", message: "Enhanced report prompt with domain-specific criteria." });
           }

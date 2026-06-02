@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Minus, Plus, SlidersHorizontal } from "lucide-react";
+import { Minus, Plus, SlidersHorizontal, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ResearchSettings } from "@/types";
@@ -52,7 +52,7 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
 
   return (
     <section className="rounded-2xl border border-secondary/10 bg-white p-5 shadow-ambient transition-all">
-      <div 
+      <div
         className="flex cursor-pointer items-center justify-between gap-4 select-none"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
@@ -70,9 +70,8 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
       </div>
 
       <div
-        className={`grid transition-all duration-300 ease-in-out ${
-          isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
-        }`}
+        className={`grid transition-all duration-300 ease-in-out ${isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+          }`}
       >
         <div className="overflow-hidden">
           <div className="space-y-4 pt-5">
@@ -106,6 +105,23 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
                       <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
                     </div>
                   </label>
+                  <label
+                    className="flex cursor-pointer items-center gap-1.5"
+                    title="Intelligently re-queries databases until max papers quota is filled with relevant results. Your weights are still used for final scoring."
+                  >
+                    <Sparkles className={`size-3.5 transition-colors ${settings.autoMode ? 'text-violet-500' : 'text-secondary/60'}`} />
+                    <span className={`text-xs font-semibold transition-colors ${settings.autoMode ? 'text-violet-600' : 'text-secondary'}`}>Smart Mode</span>
+                    <div className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={settings.autoMode ?? false}
+                        onChange={(e) => onChange({ autoMode: e.target.checked })}
+                        className="peer sr-only"
+                      />
+                      <div className="h-5 w-9 rounded-full bg-secondary/20 transition-colors peer-checked:bg-violet-500 peer-focus-visible:ring-2 peer-focus-visible:ring-violet-400/20"></div>
+                      <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+                    </div>
+                  </label>
                 </div>
               </div>
               <textarea
@@ -135,21 +151,34 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">
+              {/* {settings.autoMode && (
+                <div className="col-span-3 flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700">
+                  <Sparkles className="size-3.5 shrink-0" />
+                  <span>In Smart Mode, we intelligently adjust the weights for optimal paper discovery.</span>
+                </div>
+              )} */}
               {[
                 ["Relevance", "weightRelevance"],
                 ["Citation", "weightCitation"],
                 ["Recency", "weightRecency"],
               ].map(([label, key]) => (
-                <label key={key} className="rounded-lg border border-secondary/10 bg-surface p-3">
+                <label
+                  key={key}
+                  className={`rounded-lg border p-3 transition-all ${settings.autoMode
+                    ? "border-secondary/5 bg-secondary/5 grayscale opacity-50 cursor-not-allowed"
+                    : "border-secondary/10 bg-surface"
+                    }`}
+                >
                   <span className="mb-2 block text-xs font-semibold text-secondary">{label}</span>
                   <Input
                     type="number"
                     min="0"
                     max="1"
                     step="0.05"
+                    disabled={settings.autoMode}
                     value={settings[key as "weightRelevance" | "weightCitation" | "weightRecency"]}
                     onChange={(event) => onChange({ [key]: Number(event.target.value) })}
-                    className="h-9 border-secondary/10 bg-white text-on-surface"
+                    className="h-9 border-secondary/10 bg-white text-on-surface disabled:cursor-not-allowed"
                   />
                 </label>
               ))}
@@ -157,7 +186,11 @@ export function ResearchSettingsPanel({ settings, disabled, onChange, onRun }: P
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-secondary/10 pt-4">
               <div className="text-xs text-secondary">
-                {isAllZero ? (
+                {settings.autoMode ? (
+                  <span className="text-violet-600 font-semibold flex items-center gap-1">
+                    <Sparkles className="size-3" /> Weights are managed automatically.
+                  </span>
+                ) : isAllZero ? (
                   <span className="text-red-600 font-semibold">⚠ All weights are zero — at least one must be greater than 0.</span>
                 ) : (
                   <>

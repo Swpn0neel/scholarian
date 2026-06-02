@@ -20,6 +20,8 @@ export interface ResearchSettings {
   weightRecency: number;
   enhanceQuery?: boolean;
   enhanceReport?: boolean;
+  /** Smart Mode: intelligently re-queries until maxPapers relevant results are found. */
+  autoMode?: boolean;
 }
 
 export interface Chat {
@@ -79,4 +81,5 @@ export const DEFAULT_RESEARCH_SETTINGS: ResearchSettings = {
   weightRecency: 0.2,
   enhanceQuery: false,
   enhanceReport: false,
+  autoMode: false,
 };

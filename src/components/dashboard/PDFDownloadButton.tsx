@@ -141,6 +141,15 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     color: C.navy,
   },
+  // Landscape variant used for sections that contain wide markdown tables
+  pageLandscape: {
+    paddingTop: 44,
+    paddingBottom: 56,
+    paddingHorizontal: 44,
+    backgroundColor: C.white,
+    fontFamily: "Helvetica",
+    color: C.navy,
+  },
 
   // Header band
   headerBand: {
@@ -315,29 +324,34 @@ function MarkdownTable({ data }: { data: string[][] }) {
   const bodyRows = data.slice(1);
   const colCount = headerRow.length;
 
-  // Heuristic column widths
-  let colWidths: string[] = [];
+  // Column widths tuned for landscape A4 (≈755pt usable width).
+  // The comparison table the AI generates is always 6 cols:
+  // [Rank] | Title | Authors & Year | Methodology | Key Findings | Strengths/Limitations
+  let colWidths: string[];
   if (colCount === 6) {
-    colWidths = ["8%", "20%", "15%", "19%", "19%", "19%"];
+    colWidths = ["5%", "18%", "13%", "21%", "22%", "21%"];
   } else if (colCount === 5) {
-    colWidths = ["8%", "25%", "22%", "22%", "23%"];
+    colWidths = ["6%", "22%", "24%", "24%", "24%"];
+  } else if (colCount === 4) {
+    colWidths = ["8%", "30%", "32%", "30%"];
   } else if (colCount === 3) {
-    colWidths = ["20%", "40%", "40%"];
+    colWidths = ["15%", "42%", "43%"];
   } else {
-    colWidths = Array(colCount).fill(`${100 / colCount}%`);
+    colWidths = Array(colCount).fill(`${(100 / colCount).toFixed(1)}%`);
   }
 
   return (
-    <View style={styles.table} wrap={false}>
+    // No wrap on the outer view — rows wrap individually below
+    <View style={styles.table}>
       {/* Header */}
       <View style={styles.tableHeaderRow}>
         {headerRow.map((cellText, idx) => (
-          <View 
-            key={idx} 
-            style={{ 
-              width: colWidths[idx] || `${100 / colCount}%`, 
+          <View
+            key={idx}
+            style={{
+              width: colWidths[idx] ?? `${100 / colCount}%`,
               paddingHorizontal: 4,
-              paddingVertical: 4
+              paddingVertical: 5,
             }}
           >
             <Text style={styles.thText}>{cellText}</Text>
@@ -345,13 +359,13 @@ function MarkdownTable({ data }: { data: string[][] }) {
         ))}
       </View>
 
-      {/* Rows */}
+      {/* Body rows — wrap=false keeps a single row together, but prose wraps inside the cell */}
       {bodyRows.map((row, rowIdx) => (
         <View
           key={rowIdx}
           style={[
             styles.tableRow,
-            rowIdx % 2 === 1 ? styles.tableRowAlt : {}
+            rowIdx % 2 === 1 ? styles.tableRowAlt : {},
           ]}
           wrap={false}
         >
@@ -359,12 +373,12 @@ function MarkdownTable({ data }: { data: string[][] }) {
             <View
               key={colIdx}
               style={{
-                width: colWidths[colIdx] || `${100 / colCount}%`,
+                width: colWidths[colIdx] ?? `${100 / colCount}%`,
                 paddingHorizontal: 4,
-                paddingVertical: 4
+                paddingVertical: 5,
               }}
             >
-              <Text style={styles.tdText}>
+              <Text style={{ fontSize: 7.5, color: "#1e293b", lineHeight: 1.5 }}>
                 {stripMarkdown(cellText)}
               </Text>
             </View>
@@ -421,23 +435,30 @@ function ResearchReportPDF({
     day: "numeric",
   });
 
+  // Use landscape when the AI report contains a markdown table so the wide
+  // 6-column comparison table has enough horizontal space (~755pt vs ~500pt portrait).
+  const hasMarkdownTable = /^\|.+\|/m.test(report);
+  const pageSize = "A4";
+  const orientation = hasMarkdownTable ? "landscape" : undefined;
+  const pageStyle = hasMarkdownTable ? styles.pageLandscape : styles.page;
+
   return (
     <Document
       title="Scholarian Research Report"
       author="Scholarian"
       subject="AI-powered academic research report"
     >
-      <Page size="A4" style={styles.page}>
-        {/* ---- Header band ---- */}
+      <Page size={pageSize} orientation={orientation} style={pageStyle}>
+        {/* Header band */}
         <View style={styles.headerBand} fixed>
           <Text style={styles.headerTitle}>Scholarian Research Report</Text>
           <Text style={styles.headerSub}>Generated {generatedAt} · scholarian.vercel.app</Text>
         </View>
 
-        {/* ---- Report body ---- */}
+        {/* Report body — renders all blocks including MarkdownTable in order */}
         <ReportBody markdown={report} />
 
-        {/* ---- Papers comparison table ---- */}
+        {/* Papers score table appended after the report */}
         {papers.length > 0 && (
           <>
             <View style={styles.sectionDivider} />
@@ -450,7 +471,7 @@ function ResearchReportPDF({
           </>
         )}
 
-        {/* ---- Footer ---- */}
+        {/* Footer */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>Scholarian · AI Research Assistant</Text>
           <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`} />

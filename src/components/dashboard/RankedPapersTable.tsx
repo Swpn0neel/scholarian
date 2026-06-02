@@ -38,46 +38,6 @@ export function RankedPapersTable({
   const [copied, setCopied] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
-  const dynamicParams = useMemo(() => {
-    if (papers.length === 0) return null;
-
-    const currentYear = new Date().getFullYear();
-
-    // Mirror score.ts: sorted cit/yr array for percentile rank scoring
-    const citPerYearSorted = papers
-      .map((p) => {
-        const age = p.year ? Math.max(1, currentYear - p.year) : 1;
-        return p.citationCount / age;
-      })
-      .sort((a, b) => a - b);
-
-    // Mirror score.ts: recency window from cohort age span
-    const years = papers.map((p) => p.year).filter((y): y is number => typeof y === "number" && y > 0);
-    let recencyWindow = 12;
-    if (years.length > 0) {
-      const minYear = Math.min(...years);
-      recencyWindow = Math.max(3, Math.min(25, currentYear - minYear));
-    }
-
-    // Dynamic half-life = half the window, clamped 2 – 12 yr
-    const recencyHalfLife = Math.max(2, Math.min(12, recencyWindow / 2));
-
-    // Helper: compute the cohort percentile rank for a given paper
-    function cohortPercentile(citationCount: number, year: number | null): number {
-      if (citPerYearSorted.length === 0) return 0;
-      const age = year ? Math.max(1, currentYear - year) : 1;
-      const citPerYear = citationCount / age;
-      let rank = 0;
-      for (const v of citPerYearSorted) {
-        if (v < citPerYear) rank++;
-        else break;
-      }
-      return rank / citPerYearSorted.length;
-    }
-
-    return { citPerYearSorted, recencyWindow, recencyHalfLife, cohortPercentile };
-  }, [papers]);
-
   // Close drawer on ESC key (#19)
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -170,18 +130,18 @@ export function RankedPapersTable({
             </label>
           )}
           <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCopy}
-            className="h-10 rounded-lg border-secondary/20 text-secondary hover:border-primary/40 hover:text-primary transition-colors"
-            title="Copy table to clipboard"
-          >
-            {copied ? (
-              <><Check className="size-4 text-green-600" /><span className="text-green-600">Copied!</span></>
-            ) : (
-              <><Copy className="size-4" /><span>Copy Table</span></>
-            )}
-          </Button>
+            <Button
+              variant="outline"
+              onClick={handleCopy}
+              className="h-10 rounded-lg border-secondary/20 text-secondary hover:border-primary/40 hover:text-primary transition-colors"
+              title="Copy table to clipboard"
+            >
+              {copied ? (
+                <><Check className="size-4 text-green-600" /><span className="text-green-600">Copied!</span></>
+              ) : (
+                <><Copy className="size-4" /><span>Copy Table</span></>
+              )}
+            </Button>
             <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
               Generate Report
             </Button>
@@ -271,27 +231,20 @@ export function RankedPapersTable({
               <div className="grid grid-cols-2 gap-y-2.5 mt-2">
                 <div>Relevance Score:</div>
                 <div className="font-semibold text-on-surface text-right">
-                  {(selectedPaper.simScore ?? 0).toFixed(3)}{" "}
-                  <span className="text-xs font-normal text-secondary/65">(quality-adjusted)</span>
+                  {(selectedPaper.simScore ?? 0).toFixed(3)}
                 </div>
 
                 <div>Citation Score:</div>
                 <div className="font-semibold text-on-surface text-right">
-                  {(selectedPaper.citationScore ?? 0).toFixed(3)}{" "}
-                  <span className="text-xs font-normal text-secondary/65">
-                    ({Math.round((dynamicParams?.cohortPercentile(selectedPaper.citationCount, selectedPaper.year ?? null) ?? 0) * 100)}th pct of cohort)
-                  </span>
+                  {(selectedPaper.citationScore ?? 0).toFixed(3)}
                 </div>
 
                 <div>Recency Score:</div>
                 <div className="font-semibold text-on-surface text-right">
-                  {(selectedPaper.recencyScore ?? 0).toFixed(3)}{" "}
-                  <span className="text-xs font-normal text-secondary/65">
-                    (half-life: {dynamicParams?.recencyHalfLife ?? 5} yrs)
-                  </span>
+                  {(selectedPaper.recencyScore ?? 0).toFixed(3)}
                 </div>
 
-                <div className="border-t border-secondary/15 pt-2 font-semibold text-on-surface">Final Score (with source credibility):</div>
+                <div className="border-t border-secondary/15 pt-2 font-semibold text-on-surface">Final Score :</div>
                 <div className="border-t border-secondary/15 pt-2 font-bold text-tertiary text-base text-right">
                   {(selectedPaper.finalScore ?? 0).toFixed(3)}
                 </div>

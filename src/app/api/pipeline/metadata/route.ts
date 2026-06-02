@@ -12,6 +12,7 @@ const settingsSchema = z.object({
   weightRecency: z.number(),
   enhanceQuery: z.boolean().optional(),
   enhanceReport: z.boolean().optional(),
+  autoMode: z.boolean().optional(),
 });
 
 const schema = z.object({
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       weight_recency: body.settings.weightRecency,
       enhance_query: body.settings.enhanceQuery ?? false,
       enhance_report: body.settings.enhanceReport ?? false,
+      auto_mode: body.settings.autoMode ?? false,
       events: body.events,
     },
     { onConflict: "run_id" }
