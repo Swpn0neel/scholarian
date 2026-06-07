@@ -332,37 +332,49 @@ export function FeedbackInput({ chatId, disabled, onRefineRequest, onCustomRepor
         disabled && "opacity-60 pointer-events-none"
       )}
     >
-      <input
-        ref={inputRef}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        disabled={disabled || isLoading}
-        placeholder={disabled ? "Session finalized" : placeholder}
-        className="h-14 w-full rounded-full border border-secondary/15 bg-white pl-6 pr-16 text-[15px] text-on-surface shadow-[0_2px_12px_rgba(0,0,0,0.06)] outline-none placeholder:text-secondary/40 focus:border-primary/40 focus:ring-4 focus:ring-primary/10 transition-all"
-      />
-
-      {/* Send button — floats inside the pill on the right */}
-      <button
-        type="submit"
-        disabled={disabled || isLoading || !input.trim()}
-        aria-label="Send"
-        className={cn(
-          "absolute right-2.5 top-1/2 -translate-y-1/2 flex size-9 items-center justify-center rounded-full transition-all",
-          input.trim() && !isLoading
-            ? "bg-primary text-white shadow hover:bg-primary/90 hover:scale-105 active:scale-95"
-            : "bg-secondary/10 text-secondary/40 cursor-not-allowed"
-        )}
+      {/* Gradient border wrapper */}
+      <div
+        className="relative rounded-full p-[1.5px]"
+        style={{
+          background: input.trim()
+            ? "linear-gradient(135deg, #70d8c8 0%, #002055 50%, #001228 100%)"
+            : "linear-gradient(135deg, rgba(72,98,110,0.15) 0%, rgba(72,98,110,0.08) 100%)",
+          transition: "background 0.3s ease",
+        }}
       >
-        {isLoading ? (
-          status === "refining" ? (
-            <RefreshCw className="size-4 animate-spin" />
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={disabled || isLoading}
+          placeholder={disabled ? "Session finalized" : placeholder}
+          className="h-14 w-full rounded-full bg-white pl-6 pr-16 text-[15px] text-on-surface outline-none placeholder:text-secondary/40 transition-all"
+        />
+
+        {/* Send button — floats inside the pill on the right */}
+        <button
+          type="submit"
+          disabled={disabled || isLoading || !input.trim()}
+          aria-label="Send"
+          className={cn(
+            "absolute right-2 top-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full transition-all duration-200",
+            input.trim() && !isLoading
+              ? "shadow-md hover:scale-105 active:scale-95"
+              : "bg-secondary/10 text-secondary/30 cursor-not-allowed"
+          )}
+          style={input.trim() && !isLoading ? { background: "linear-gradient(135deg, #001228 0%, #002055 100%)", color: "#70d8c8" } : undefined}
+        >
+          {isLoading ? (
+            status === "refining" ? (
+              <RefreshCw className="size-4 animate-spin" />
+            ) : (
+              <Loader2 className="size-4 animate-spin" />
+            )
           ) : (
-            <Loader2 className="size-4 animate-spin" />
-          )
-        ) : (
-          <Send className="size-4" />
-        )}
-      </button>
+            <Send className="size-4" />
+          )}
+        </button>
+      </div>
     </form>
   );
 }

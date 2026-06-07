@@ -52,6 +52,7 @@ next-env.d.ts
 .kiro/
 .codex/
 .antigravitycli/
+.agents/
 artifacts/
 scratch/
 CLAUDE.md
@@ -62,3 +63,4 @@ walkthrough.md
 research_notes.md
 analysis_results.md
 experiment_results.md
+skills-lock.json

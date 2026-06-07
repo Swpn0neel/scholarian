@@ -141,7 +141,7 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    
+
     // Only auto-scroll if we are currently running the pipeline and the user is at the bottom
     if (pipeline.isRunning && isAtBottom) {
       el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
@@ -194,19 +194,30 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto"
+        style={{
+          backgroundImage: "radial-gradient(circle, rgba(0,49,120,0.055) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+          backgroundColor: "#f8f9fb",
+        }}
       >
         <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 pb-6 space-y-5">
           {/* ── Header ── */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h1
-                className="font-heading text-3xl font-semibold text-on-surface truncate transition-all duration-300"
+                className="font-heading text-4xl font-bold text-on-surface truncate transition-all duration-300"
                 title={displayTitle ?? "Research Workspace"}
               >
-                {displayTitle ?? "Research Workspace"}
+                {displayTitle ? (
+                  displayTitle
+                ) : (
+                  <>
+                    Research <span style={{ fontFamily: "var(--font-playfair)", fontStyle: "italic", color: "#001228" }}>Workspace</span>
+                  </>
+                )}
               </h1>
-              <p className="mt-1 text-sm text-secondary">
-                {displayTitle ? "Fetch, rank, synthesize, refine." : "Enter a topic below to start."}
+              <p className="mt-1 text-sm font-medium text-secondary">
+                {displayTitle ? "" : "Enter a topic below to start."}
               </p>
             </div>
           </div>
@@ -223,32 +234,19 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
           {pipeline.completedRuns.length > 0 && (
             <div className="space-y-6">
               {pipeline.completedRuns.map((run, i) => {
-                let runMsgs = messagesByRunId.get(run.runId!) ?? [];
+                const runMsgs = messagesByRunId.get(run.runId!) ?? [];
 
                 // Backward compatibility: Synthesize report message if run has report but no report message
-                if (run.reportMarkdown && !runMsgs.some(m => m.type === "report" && m.answer === run.reportMarkdown)) {
-                  runMsgs = [
-                    ...runMsgs,
-                    {
-                      id: `synth-${run.id}`,
-                      type: "report" as const,
-                      question: `Research report · ${run.topic}`,
-                      answer: run.reportMarkdown,
-                      index: 0,
-                      createdAt: run.completedAt + 1,
-                      runId: run.runId,
-                      reportPapers: run.papers.slice(0, run.settings.topK),
-                      reportTopK: run.settings.topK
-                    }
-                  ].sort((a, b) => a.createdAt - b.createdAt);
-                }
+                // Filter out the main report message if it was persisted to the DB,
+                // because it is now rendered directly inside CompletedRunCard.
+                const threadMsgs = runMsgs.filter(m => !(m.type === "report" && m.answer === run.reportMarkdown));
 
                 return (
                   <div key={run.id} className="space-y-6">
                     <div className="space-y-3">
                       <CompletedRunCard run={run} index={i + 1} />
-                      {runMsgs.length > 0 && (
-                        <QAThread messages={runMsgs} reportCount={reportCount} />
+                      {threadMsgs.length > 0 && (
+                        <QAThread messages={threadMsgs} reportCount={reportCount} />
                       )}
                       {/* Connector between runs */}
                       <div className="flex items-center gap-3 px-4 pt-3">
@@ -361,8 +359,9 @@ function ChatWorkspace({ chatId }: { chatId: string }) {
 
           {/* Bar — free-floating, shadow fades in when scrolled up */}
           <div
-            className={`bg-surface/80 backdrop-blur-md transition-all duration-300 ${!isAtBottom ? "shadow-[0_-12px_32px_-8px_rgba(0,0,0,0.07)]" : ""
+            className={`backdrop-blur-lg transition-all duration-300 ${!isAtBottom ? "shadow-[0_-16px_40px_-8px_rgba(0,49,120,0.18)] border-t border-secondary/8" : ""
               }`}
+            style={{ background: "rgba(248,249,251,0.92)" }}
           >
             <div className="mx-auto max-w-4xl px-4 py-4 md:px-8">
               <FeedbackInput

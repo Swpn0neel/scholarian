@@ -1,20 +1,22 @@
 "use client";
 
-import { memo } from "react";
-import { Archive, FileText, Trophy } from "lucide-react";
+import { memo, useState } from "react";
+import { Archive, FileText, Trophy, ChevronDown } from "lucide-react";
 import type { CompletedRun } from "@/hooks/useResearchStore";
-// ReportViewer imported via QAThread now
 import { RankedPapersTable } from "./RankedPapersTable";
+import { ReportViewer } from "./ReportViewer";
 import { PipelineProgress } from "./PipelineProgress";
 import type { PipelineStep } from "@/types";
-import { cn } from "@/lib/utils";
 
 interface Props {
   run: CompletedRun;
   index: number; // 1-based run number
 }
 
+import { cn } from "@/lib/utils";
+
 export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: Props) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const paperCount = run.papers.length;
   const hasReport = Boolean(run.reportMarkdown);
 
@@ -37,51 +39,61 @@ export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: P
       ];
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-secondary/15 shadow-ambient">
+    <div className="overflow-hidden rounded-2xl border border-secondary/15 shadow-[0_16px_48px_-12px_rgba(0,49,120,0.12)]">
       {/* ── Run header ── */}
-      <div className="flex items-center gap-3 bg-gradient-to-r from-surface-container to-surface-container-low px-5 py-4 border-b border-secondary/10">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-          {index}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Archive className="size-3.5 text-secondary/60 shrink-0" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-secondary/60">
-              Research Run {index}
-            </span>
-            <span className="text-[10px] text-secondary/40">·</span>
-            <span className="text-[10px] text-secondary/40">{date}</span>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between gap-4 px-5 py-4 border-b border-white/8 transition-colors hover:brightness-110 cursor-pointer text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        style={{ background: "linear-gradient(135deg, #001228 0%, #002055 100%)" }}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-transform"
+            style={{ background: "rgba(112,216,200,0.15)", color: "#70d8c8" }}
+          >
+            {index}
           </div>
-          <p className="mt-0.5 text-base font-semibold text-on-surface truncate" title={run.topic}>
-            {run.topic}
-          </p>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Archive className="size-3.5 text-white/35 shrink-0" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/35">
+                Research Run {index}
+              </span>
+              <span className="text-[10px] text-white/20">·</span>
+              <span className="text-[10px] text-white/20">{date}</span>
+            </div>
+            <p className="mt-0.5 text-base font-semibold text-white truncate" title={run.topic}>
+              {run.topic}
+            </p>
+          </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          {paperCount > 0 && (
-            <span className={cn(
-              "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-              "bg-primary/8 text-primary"
-            )}>
-              <Trophy className="size-3" />
-              {paperCount} papers
-            </span>
-          )}
-          {hasReport && (
-            <span className={cn(
-              "flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-              "bg-tertiary-fixed-dim/20 text-tertiary"
-            )}>
-              <FileText className="size-3" />
-              Report
-            </span>
-          )}
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
+            {paperCount > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/60">
+                <Trophy className="size-3" />
+                {paperCount} papers
+              </span>
+            )}
+            {hasReport && (
+              <span className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: "rgba(112,216,200,0.15)", color: "#70d8c8" }}>
+                <FileText className="size-3" />
+                Report
+              </span>
+            )}
+          </div>
+          
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white">
+            <ChevronDown className={cn("size-5 transition-transform duration-300", isExpanded && "rotate-180")} />
+          </div>
         </div>
-      </div>
+      </button>
 
       {/* ── Body: Pipeline → Papers → Report stacked ── */}
-      <div className="divide-y divide-secondary/8 bg-white">
+      {isExpanded && (
+        <div className="divide-y divide-secondary/8 bg-white animate-in slide-in-from-top-1 fade-in duration-200">
         {/* Pipeline progress (always shown, in "complete" state) */}
         <div className="px-1 py-1">
           <PipelineProgress
@@ -103,7 +115,19 @@ export const CompletedRunCard = memo(function CompletedRunCard({ run, index }: P
           </div>
         )}
 
-      </div>
+        {/* The Generated Report */}
+        {hasReport && (
+          <div className="p-4 bg-surface/30">
+            <ReportViewer
+              markdown={run.reportMarkdown}
+              papers={run.papers.slice(0, run.settings?.topK ?? 5)}
+              topK={Math.min(run.settings?.topK ?? 5, paperCount)}
+            />
+          </div>
+        )}
+
+        </div>
+      )}
     </div>
   );
 });

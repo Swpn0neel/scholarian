@@ -105,18 +105,31 @@ export function RankedPapersTable({
 
 
   return (
-    <section className="rounded-2xl border border-secondary/10 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-heading text-lg font-semibold text-on-surface">Ranked Papers</h2>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-secondary">
-            <span>Top {topK} highlighted for report generation.</span>
+    <section className="overflow-hidden rounded-2xl border border-secondary/10 shadow-[0_20px_60px_-15px_rgba(0,49,120,0.12)]">
+
+      {/* ── Navy header bar ── */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 px-6 py-4"
+        style={{ background: "linear-gradient(135deg, #001228 0%, #002055 100%)" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+            <ArrowDownUp className="size-4 text-tertiary-fixed-dim" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">Results</p>
+            <h2 className="text-base font-bold text-white leading-tight">Ranked Papers</h2>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-3">
+          {/* Paper count badge */}
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white/60">
+            Top {topK} of {papers.length}
+          </span>
           {papers.length > maxPapers && (
             <label className="flex cursor-pointer items-center gap-2" title="Show all fetched and ranked papers">
-              <span className="text-xs font-semibold text-secondary">Show all ({papers.length})</span>
+              <span className="text-xs font-semibold text-white/50">Show all</span>
               <div className="relative inline-flex items-center">
                 <input
                   type="checkbox"
@@ -124,8 +137,8 @@ export function RankedPapersTable({
                   onChange={(e) => setShowAll(e.target.checked)}
                   className="peer sr-only"
                 />
-                <div className="h-5 w-9 rounded-full bg-secondary/20 transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/20"></div>
-                <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"></div>
+                <div className="h-5 w-9 rounded-full bg-white/15 transition-colors peer-checked:bg-tertiary-fixed-dim peer-focus-visible:ring-2 peer-focus-visible:ring-tertiary-fixed-dim/20" />
+                <div className="absolute left-[2px] top-[2px] size-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" />
               </div>
             </label>
           )}
@@ -133,74 +146,82 @@ export function RankedPapersTable({
             <Button
               variant="outline"
               onClick={handleCopy}
-              className="h-10 rounded-lg border-secondary/20 text-secondary hover:border-primary/40 hover:text-primary transition-colors"
+              className="h-9 rounded-lg border-white/15 bg-white/8 text-white/60 hover:bg-white/15 hover:text-white transition-colors"
               title="Copy table to clipboard"
             >
               {copied ? (
-                <><Check className="size-4 text-green-600" /><span className="text-green-600">Copied!</span></>
+                <><Check className="size-4 text-tertiary-fixed-dim" /><span className="text-tertiary-fixed-dim">Copied!</span></>
               ) : (
-                <><Copy className="size-4" /><span>Copy Table</span></>
+                <><Copy className="size-4" /><span>Copy</span></>
               )}
             </Button>
-            <Button disabled={!canGenerate} onClick={onGenerateReport} className="h-10 rounded-lg bg-primary text-white">
+            <Button
+              disabled={!canGenerate}
+              onClick={onGenerateReport}
+              className="h-9 rounded-lg font-bold transition-all"
+              style={{ background: "#70d8c8", color: "#001228" }}
+            >
               Generate Report
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="overflow-auto max-h-[550px] rounded-lg border border-secondary/10">
-        <table className="w-full min-w-[820px] text-left text-sm relative">
-          <thead className="sticky top-0 z-10 bg-surface-container-low text-xs uppercase tracking-[0.14em] text-secondary shadow-sm">
-            <tr>
-              {(
-                [
-                  ["rank", "Rank"],
-                  ["title", "Title"],
-                  ["year", "Year"],
-                  ["citationCount", "Citations"],
-                  ["simScore", "Relevance"],
-                  ["finalScore", "Final"],
-                  ["source", "Source"],
-                ] as [SortKey, string][]
-              ).map(([key, label]) => (
-                <th key={key} className="px-3 py-3">
-                  <button
-                    className="inline-flex items-center gap-1 hover:text-primary transition-colors"
-                    onClick={() => toggleSort(key)}
-                  >
-                    {label}
-                    <SortIcon sortKey={sortKey} column={key} sortDir={sortDir} />
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-secondary/10">
-            {sorted.map((paper) => (
-              <tr
-                key={`${paper.rank}-${paper.title}`}
-                onClick={() => setSelectedPaper(paper)}
-                className={cn(
-                  "cursor-pointer transition hover:bg-surface",
-                  paper.rank <= topK && "bg-primary/10"
-                )}
-              >
-                <td className="px-3 py-3 font-semibold text-on-surface">{paper.rank}</td>
-                <td className="max-w-[360px] truncate px-3 py-3 text-on-surface" title={paper.title}>
-                  {paper.title}
-                </td>
-                <td className="px-3 py-3 text-secondary">{paper.year ?? "n/a"}</td>
-                <td className="px-3 py-3 text-secondary">{paper.citationCount}</td>
-                <td className="px-3 py-3 text-secondary">{(paper.simScore ?? 0).toFixed(3)}</td>
-                <td className="px-3 py-3 font-semibold text-tertiary">{(paper.finalScore ?? 0).toFixed(3)}</td>
-                <td className="px-3 py-3">
-                  <Badge className="rounded-md bg-secondary-container/60 text-primary">{paper.source}</Badge>
-                </td>
+      {/* ── White table body ── */}
+      <div className="bg-white p-5">
+        <div className="overflow-auto max-h-[480px] rounded-xl border border-secondary/10">
+          <table className="w-full min-w-[820px] text-left text-sm relative">
+            <thead className="sticky top-0 z-10 bg-[#f4f6f8] text-xs uppercase tracking-[0.14em] text-[#001228]/70 shadow-sm border-b border-secondary/10">
+              <tr>
+                {(
+                  [
+                    ["rank", "Rank"],
+                    ["title", "Title"],
+                    ["year", "Year"],
+                    ["citationCount", "Citations"],
+                    ["simScore", "Relevance"],
+                    ["finalScore", "Final"],
+                    ["source", "Source"],
+                  ] as [SortKey, string][]
+                ).map(([key, label]) => (
+                  <th key={key} className="px-3 py-3">
+                    <button
+                      className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+                      onClick={() => toggleSort(key)}
+                    >
+                      {label}
+                      <SortIcon sortKey={sortKey} column={key} sortDir={sortDir} />
+                    </button>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-secondary/10">
+              {sorted.map((paper) => (
+                <tr
+                  key={`${paper.rank}-${paper.title}`}
+                  onClick={() => setSelectedPaper(paper)}
+                  className={cn(
+                    "cursor-pointer transition hover:bg-surface",
+                    paper.rank <= topK && "bg-primary/10"
+                  )}
+                >
+                  <td className="px-3 py-3 font-semibold text-on-surface">{paper.rank}</td>
+                  <td className="max-w-[360px] truncate px-3 py-3 text-on-surface" title={paper.title}>
+                    {paper.title}
+                  </td>
+                  <td className="px-3 py-3 text-secondary">{paper.year ?? "n/a"}</td>
+                  <td className="px-3 py-3 text-secondary">{paper.citationCount}</td>
+                  <td className="px-3 py-3 text-secondary">{(paper.simScore ?? 0).toFixed(3)}</td>
+                  <td className="px-3 py-3 font-semibold text-tertiary">{(paper.finalScore ?? 0).toFixed(3)}</td>
+                  <td className="px-3 py-3">
+                    <Badge className="rounded-md bg-secondary-container/60 text-primary">{paper.source}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
 

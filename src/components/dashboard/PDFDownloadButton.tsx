@@ -515,10 +515,10 @@ export function PDFDownloadButton({
       <Button
         variant="outline"
         disabled
-        className="h-10 border-secondary/10 bg-white text-secondary cursor-not-allowed opacity-60"
+        className="h-10 px-3 sm:px-4 border-secondary/10 bg-white text-secondary cursor-not-allowed opacity-60"
       >
         <Loader2 className="size-4 animate-spin" />
-        {isGenerating ? "Generating report…" : "Download PDF"}
+        <span className="hidden sm:inline">{isGenerating ? "Generating report…" : "Download PDF"}</span>
       </Button>
     );
   }
@@ -547,17 +547,17 @@ export function PDFDownloadButton({
           <Button
             variant="outline"
             disabled={loading}
-            className="h-10 border-secondary/10 bg-white text-primary hover:bg-surface"
+            className="h-10 px-3 sm:px-4 border-secondary/10 bg-white text-primary hover:bg-surface"
           >
             {loading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Preparing PDF…
+                <span className="hidden sm:inline">Preparing PDF…</span>
               </>
             ) : (
               <>
                 <Download className="size-4" />
-                Download PDF
+                <span className="hidden sm:inline">Download PDF</span>
               </>
             )}
           </Button>

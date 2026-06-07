@@ -58,7 +58,7 @@ export function ReportViewer({
   isGenerating = false,
   title = "Research Report",
   subtitle,
-  headerBg = "bg-gradient-to-r from-primary to-primary-container",
+  headerBg = "bg-[linear-gradient(135deg,#001228_0%,#002055_100%)]",
   icon: Icon = BookOpen,
 }: ReportViewerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -105,13 +105,13 @@ export function ReportViewer({
       {/* Backdrop for overlay mode */}
       {isFullscreen && (
         <>
-          <div 
-            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm transition-opacity"
+          <div
+            className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm transition-opacity"
             onClick={() => setIsFullscreen(false)}
           />
           <button
             onClick={() => setIsFullscreen(false)}
-            className="fixed top-6 right-6 md:top-8 md:right-8 z-[70] flex size-11 items-center justify-center rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] text-secondary hover:text-on-surface hover:scale-105 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
+            className="fixed top-6 right-6 md:top-8 md:right-8 z-70 flex size-11 items-center justify-center rounded-full bg-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] text-secondary hover:text-on-surface hover:scale-105 active:scale-95 transition-all animate-in fade-in zoom-in-95 duration-200"
             aria-label="Close overlay"
           >
             <X className="size-5" />
@@ -122,7 +122,7 @@ export function ReportViewer({
       <section
         className={
           isFullscreen
-            ? "fixed inset-4 md:inset-y-8 lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-5xl z-[65] overflow-auto rounded-2xl bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 animate-in fade-in zoom-in-[0.98] duration-200 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-secondary/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-secondary/20"
+            ? "fixed inset-4 md:inset-y-8 lg:left-1/2 lg:-translate-x-1/2 lg:w-full lg:max-w-5xl z-65 overflow-auto rounded-2xl bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 animate-in fade-in zoom-in-[0.98] duration-200 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-secondary/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-secondary/20"
             : "rounded-2xl border border-secondary/10 bg-white shadow-ambient transition-all duration-300"
         }
       >
@@ -132,70 +132,76 @@ export function ReportViewer({
           <div className="pointer-events-none absolute -right-8 -top-8 size-40 rounded-full bg-white/5" />
           <div className="pointer-events-none absolute -right-2 bottom-0 size-20 rounded-full bg-white/5" />
 
-          <div className="relative flex flex-col sm:flex-row sm:items-center items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-                <Icon className="size-5 text-white" />
+          <div className="relative flex flex-col gap-4">
+            {/* Top row: Title and Buttons */}
+            <div className="flex items-start sm:items-center justify-between gap-3">
+              {/* Title Block */}
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm mt-0.5 sm:mt-0">
+                  <Icon className="size-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <h2
+                    className="text-lg sm:text-xl font-bold leading-tight text-white truncate"
+                    style={{ fontFamily: "var(--font-playfair)", fontStyle: "italic" }}
+                  >
+                    {title}
+                  </h2>
+                  <p className="mt-0.5 text-xs sm:text-sm text-tertiary-fixed-dim/80 truncate">
+                    {subtitle || `AI-synthesized from top ${topK} papers`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-heading text-lg font-semibold leading-tight text-white">
-                  {title}
-                </h2>
-                <p className="mt-0.5 text-xs text-blue-200">
-                  {subtitle || `AI-synthesized from top ${topK} papers`}
-                </p>
-              </div>
-            </div>
 
-            <div className="flex shrink-0 items-center gap-2 w-full sm:w-auto justify-end">
-              {/* Fullscreen toggle & Close */}
-              {markdown && (
-                <div className="flex items-center">
+              {/* Buttons Block */}
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Fullscreen toggle & Close */}
+                {markdown && (
                   <button
                     onClick={() => setIsFullscreen((f) => !f)}
-                    className="rounded-lg p-1.5 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+                    className="rounded-lg p-2 text-white/70 transition-colors hover:bg-white/15 hover:text-white"
                     aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                   >
                     {isFullscreen ? (
-                      <Minimize2 className="size-4" />
+                      <Minimize2 className="size-4.5 sm:size-4" />
                     ) : (
-                      <Maximize2 className="size-4" />
+                      <Maximize2 className="size-4.5 sm:size-4" />
                     )}
                   </button>
-                </div>
-              )}
-              <PDFDownloadButton
-                report={markdown}
-                papers={papers}
-                topK={topK}
-                isGenerating={isGenerating}
-              />
+                )}
+                <PDFDownloadButton
+                  report={markdown}
+                  papers={papers}
+                  topK={topK}
+                  isGenerating={isGenerating}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Meta bar — only once we have content */}
-          {markdown && (
-            <div className="relative mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-blue-200 leading-snug">
-              <span className="flex items-center gap-1">
-                <FileText className="size-3" />
-                {words.toLocaleString()} words
-              </span>
-              <span className="text-white/30">·</span>
-              <span>{readTime(words)} min read</span>
-              {sections > 0 && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{sections} sections</span>
-                </>
-              )}
-              {papers.length > 0 && (
-                <>
-                  <span className="text-white/30">·</span>
-                  <span>{papers.length} papers analysed</span>
-                </>
-              )}
-            </div>
-          )}
+            {/* Meta bar */}
+            {markdown && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-white/70 leading-snug">
+                <span className="flex items-center gap-1">
+                  <FileText className="size-3" />
+                  {words.toLocaleString()} words
+                </span>
+                <span className="text-white/30">·</span>
+                <span>{readTime(words)} min read</span>
+                {sections > 0 && (
+                  <>
+                    <span className="text-white/30">·</span>
+                    <span>{sections} sections</span>
+                  </>
+                )}
+                {papers.length > 0 && (
+                  <>
+                    <span className="text-white/30 hidden sm:inline">·</span>
+                    <span className="w-full sm:w-auto">{papers.length} papers analysed</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Body ───────────────────────────────────────────────── */}
@@ -220,9 +226,8 @@ export function ReportViewer({
             <>
               {/* Collapsed gradient fade */}
               <div
-                className={`relative transition-[max-height] duration-500 ease-in-out ${
-                  !isExpanded && !isFullscreen ? "max-h-[480px] overflow-hidden" : "max-h-[9999px]"
-                }`}
+                className={`relative transition-[max-height] duration-500 ease-in-out ${!isExpanded && !isFullscreen ? "max-h-[480px] overflow-hidden" : "max-h-[9999px]"
+                  }`}
               >
                 <article
                   className="report-body max-w-none"
@@ -231,7 +236,7 @@ export function ReportViewer({
 
                 {/* Fade-out overlay when collapsed */}
                 {!isExpanded && !isFullscreen && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white via-white/80 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-white via-white/80 to-transparent" />
                 )}
               </div>
 

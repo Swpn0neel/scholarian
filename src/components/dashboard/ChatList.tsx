@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useChat } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
 
-export function ChatList() {
+export function ChatList({ onItemClick, dark }: { onItemClick?: () => void; dark?: boolean }) {
   const params = useParams<{ chatId?: string }>();
   const router = useRouter();
   const activeChatId = params?.chatId;
@@ -112,14 +112,14 @@ export function ChatList() {
   if (isLoading && !chats.length) {
     return (
       <div className="flex items-center justify-center py-6">
-        <Loader2 className="size-4 animate-spin text-secondary" />
+        <Loader2 className={`size-4 animate-spin ${dark ? "text-white/30" : "text-secondary"}`} />
       </div>
     );
   }
 
   if (!chats.length) {
     return (
-      <div className="px-3 py-4 text-xs text-secondary text-center">
+      <div className={`px-3 py-4 text-xs text-center ${dark ? "text-white/35" : "text-secondary"}`}>
         No research chats yet.
         <br />
         <span className="text-[10px] opacity-60">Click &quot;New Chat&quot; to get started</span>
@@ -139,9 +139,15 @@ export function ChatList() {
             key={chat.id}
             className={cn(
               "group relative flex min-h-10 flex-col rounded-md border-l-2 border-transparent transition-all",
-              isActive && "border-primary bg-primary/10",
-              !isActive && !isPendingDelete && "hover:translate-x-1 hover:bg-surface-container-low",
-              isPendingDelete && "border-red-400/60 bg-red-50/70",
+              dark ? [
+                isActive && "border-tertiary-fixed-dim/60 bg-white/8",
+                !isActive && !isPendingDelete && "hover:translate-x-1 hover:bg-white/5",
+                isPendingDelete && "border-red-400/50 bg-red-900/20",
+              ] : [
+                isActive && "border-primary bg-primary/10",
+                !isActive && !isPendingDelete && "hover:translate-x-1 hover:bg-surface-container-low",
+                isPendingDelete && "border-red-400/60 bg-red-50/70",
+              ],
               isActuallyDeleting && "opacity-40 pointer-events-none"
             )}
           >
@@ -164,7 +170,10 @@ export function ChatList() {
                       void handleSubmitEdit(e);
                     }
                   }}
-                  className="h-8 flex-1 min-w-0 rounded bg-white px-2 text-sm text-on-surface outline-none ring-1 ring-secondary/15 focus:ring-primary/30"
+                  className={`h-8 flex-1 min-w-0 rounded px-2 text-sm outline-none ring-1 focus:ring-primary/30 ${dark
+                      ? "bg-white/10 text-white placeholder-white/30 ring-white/15"
+                      : "bg-white text-on-surface ring-secondary/15"
+                    }`}
                   placeholder="Chat name"
                 />
                 <button
@@ -193,17 +202,23 @@ export function ChatList() {
                     if (chat.id === activeChatId || navigatingToId === chat.id) return;
                     setNavigatingToId(chat.id);
                     router.push(`/dashboard/${chat.id}`);
+                    onItemClick?.();
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       if (chat.id === activeChatId || navigatingToId === chat.id) return;
                       setNavigatingToId(chat.id);
                       router.push(`/dashboard/${chat.id}`);
+                      onItemClick?.();
                     }
                   }}
                   className={cn(
                     "flex-1 min-w-0 cursor-pointer truncate py-2 text-sm transition-colors",
-                    isPendingDelete ? "text-red-700 font-medium" : "text-on-surface hover:text-primary"
+                    isPendingDelete
+                      ? (dark ? "text-red-400 font-medium" : "text-red-700 font-medium")
+                      : dark
+                        ? (isActive ? "text-white" : "text-white/65 hover:text-white")
+                        : "text-on-surface hover:text-primary"
                   )}
                 >
                   {isActuallyDeleting ? (
@@ -227,20 +242,20 @@ export function ChatList() {
                     <Button
                       size="icon-xs"
                       variant="ghost"
-                      className="hover:bg-secondary/10"
+                      className={dark ? "hover:bg-white/10" : "hover:bg-secondary/10"}
                       aria-label="Rename chat"
                       onClick={(e) => handleStartEdit(e, chat)}
                     >
-                      <Pencil className="size-3.5 text-secondary" />
+                      <Pencil className={`size-3.5 ${dark ? "text-white/35" : "text-secondary"}`} />
                     </Button>
                     <Button
                       size="icon-xs"
                       variant="ghost"
-                      className="hover:bg-red-50"
+                      className={dark ? "hover:bg-red-900/30" : "hover:bg-red-50"}
                       aria-label="Delete chat"
                       onClick={(e) => handleDeleteClick(e, chat.id)}
                     >
-                      <Trash2 className="size-3.5 text-secondary" />
+                      <Trash2 className={`size-3.5 ${dark ? "text-white/35" : "text-secondary"}`} />
                     </Button>
                   </div>
                 )}
@@ -250,14 +265,14 @@ export function ChatList() {
             {/* ── Inline confirmation strip ── */}
             {isPendingDelete && (
               <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                <span className="flex items-center gap-1 text-[11px] font-medium text-red-600">
+                <span className={`flex items-center gap-1 text-[11px] font-medium ${dark ? "text-red-400" : "text-red-600"}`}>
                   <AlertTriangle className="size-3 shrink-0" />
                   Delete this chat?
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={(e) => handleCancelDelete(e)}
-                    className="rounded px-2 py-0.5 text-[11px] text-secondary hover:bg-secondary/10 transition-colors"
+                    className={`rounded px-2 py-0.5 text-[11px] transition-colors ${dark ? "text-white/40 hover:bg-white/10" : "text-secondary hover:bg-secondary/10"}`}
                   >
                     Cancel
                   </button>

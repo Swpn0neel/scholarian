@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Manrope, Inter } from "next/font/google";
+import { Manrope, Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  style: ["italic"],
+  weight: ["700", "800"],
   display: "swap",
 });
 
@@ -43,9 +51,7 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  icons: {
-    icon: "/favicon.svg",
-  },
+
 };
 
 export default function RootLayout({
@@ -56,8 +62,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${inter.variable} antialiased`}
+      className={`${manrope.variable} ${inter.variable} ${playfair.variable} antialiased`}
     >
+
       <body suppressHydrationWarning className="font-sans bg-surface text-on-surface min-h-full flex flex-col">{children}</body>
     </html>
   );
